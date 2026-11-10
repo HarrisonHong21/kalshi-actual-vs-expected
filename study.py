@@ -6,15 +6,16 @@ Each row of the input is one Kalshi contract ("will this player go over this lin
 price to buy YES and the price to buy NO just before the game, and how it settled. The script:
 
 1. compares how often contracts paid out (actual) with the chance their price implied (expected);
-2. splits what a buyer lost into the spread, the fee and the midpoint being wrong;
+2. splits what a buyer would have lost into the half-spread, the fee and the midpoint being wrong;
 3. compares Kalshi's midpoint with a second opinion: a curve fitted to sportsbook lines;
-4. checks how much the headline results move when any one game is dropped, and how the
-   return changes with the size of the order.
+4. checks how much the headline results move when any one game is dropped, when each
+   player-game or each game is given equal weight, and with the size of the order.
 
 Every definition below was fixed before looking at the results, so the study can't go hunting
 for a flattering cut of the data.
 """
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -75,13 +76,24 @@ def load(paths):
     return pd.concat(tables, ignore_index=True)
 
 
-def prepare(raw):
-    """Keep contracts that settled plainly yes or no, and add the columns the study uses.
+def _hours_before(table):
+    """Hours between when each price was logged and the start of its game (negative = after the start)."""
+    kickoff = pd.to_datetime(table["game_time"], utc=True)
+    scanned = pd.to_datetime(table["logged_at"], utc=True)
+    return (kickoff - scanned).dt.total_seconds() / 3600
 
-    Contracts settled part-way ("scalar", e.g. the player left the game) are left out: they
-    didn't simply happen or not happen.
+
+def prepare(raw):
+    """Keep contracts priced before the start that settled plainly yes or no, and add the
+    columns the study uses.
+
+    Left out: prices logged after the game started (they could already reflect what happened),
+    contracts settled part-way ("scalar", e.g. the player left the game), and contracts not
+    settled yet. data_quality() counts each of these.
     """
-    df = raw[raw["result"].isin(["yes", "no"])].copy()
+    df = raw.copy()
+    df["hours_before"] = _hours_before(df)
+    df = df[df["result"].isin(["yes", "no"]) & (df["hours_before"] >= 0)].copy()
     df["happened"] = (df["result"] == "yes").astype(int)
 
     # Buying NO at no_ask is the same as selling YES at 1 - no_ask, so that is the YES bid.
@@ -94,13 +106,41 @@ def prepare(raw):
     signed_distance = np.where(df["line"] > df["middle"], 1, -1) * df["distance"]
     df["distance_band"] = pd.cut(signed_distance, DISTANCE_EDGES, right=False, labels=DISTANCE_LABELS)
 
-    kickoff = pd.to_datetime(df["game_time"], utc=True)
-    scanned = pd.to_datetime(df["logged_at"], utc=True)
-    df["hours_before"] = (kickoff - scanned).dt.total_seconds() / 3600
     df["fresh"] = df["hours_before"] <= FRESH_HOURS
 
     df["game_id"] = df["league"] + ":" + df["event_id"].astype(str)
     return df
+
+
+def data_quality(raw, paths=None):
+    """What was read and what was left out, for each league: a record of the input that can be
+    published when the raw prices can't be. `paths` ({"NFL": path, ...}) adds a SHA-256
+    fingerprint of each input file, which identifies the exact data behind the results."""
+    rows = []
+    for league, part in raw.groupby("league", sort=False):
+        after_start = _hours_before(part) < 0
+        before = part[~after_start]
+        df = prepare(part)
+        used = df[df["midpoint"].notna()]
+        kickoff = pd.to_datetime(used["game_time"], utc=True).dt.tz_convert("America/New_York")
+        part_way = int((before["result"] == "scalar").sum())
+        rows.append({
+            "league": league,
+            "rows_read": len(part),
+            "logged_after_start": int(after_start.sum()),
+            "settled_part_way": part_way,
+            "not_settled": len(before) - part_way - len(df),
+            "settled_yes_or_no": len(df),
+            "no_price_to_sell": len(df) - len(used),
+            "in_the_analysis": len(used),
+            "duplicate_tickers": int(part["ticker"].duplicated().sum()) if "ticker" in part else None,
+            "games": used["game_id"].nunique(),
+            "player_games": used.groupby(["game_id", "player"]).ngroups,
+            "first_game": str(kickoff.min().date()) if len(used) else None,
+            "last_game": str(kickoff.max().date()) if len(used) else None,
+            "input_sha256": hashlib.sha256(Path(paths[league]).read_bytes()).hexdigest() if paths else None,
+        })
+    return pd.DataFrame(rows)
 
 
 def credibility(contracts, expected_rate):
@@ -215,24 +255,28 @@ def yes_buy_return(df, contracts=ORDER_SIZE):
 def cost_table(df, contracts=ORDER_SIZE, resamples=RESAMPLES, seed=SEED):
     """Where a YES buyer's money went, for each price band and for all prices together.
 
-    A buyer pays the ask plus the fee and gets $1 if the contract pays out. What they lose per
-    contract splits exactly into three parts:
+    This is a hypothetical: buy one order of every contract at the quoted ask and hold it to
+    settlement. A buyer pays the ask plus the fee and gets $1 if the contract pays out. What
+    they lose per contract splits exactly into three parts:
 
         (ask + fee) - payout  =  (ask - midpoint)  +  fee  +  (midpoint - payout)
-                                  the spread          fee     the midpoint being wrong
+                                  the half-spread     fee     the midpoint being wrong
+
+    The half-spread is half the gap between the buy and sell price: what a buyer pays above
+    the midpoint.
 
     Each part is shown as a share of the money spent. The first two are known when you buy;
     only the third depends on what happened, so only it (and the total) gets a range.
     """
     df = df[df["midpoint"].notna()].assign(one=1)
-    df["spread"] = df["yes_ask"] - df["midpoint"]
+    df["half_spread"] = df["yes_ask"] - df["midpoint"]
     df["fee"] = df["yes_ask"].map(lambda p: fee_per_contract(p, contracts))
     df["miss"] = df["midpoint"] - df["happened"]
     df["spent"] = df["yes_ask"] + df["fee"]
 
     games = sorted(df["game_id"].unique())
     sums = {}
-    for column in ["one", "yes_ask", "midpoint", "happened", "spread", "fee", "miss", "spent"]:
+    for column in ["one", "yes_ask", "midpoint", "happened", "half_spread", "fee", "miss", "spent"]:
         by_band = _per_game(df, games, column)
         # one extra column on the end for all prices together
         sums[column] = np.column_stack([by_band, by_band.sum(axis=1)])
@@ -241,7 +285,7 @@ def cost_table(df, contracts=ORDER_SIZE, resamples=RESAMPLES, seed=SEED):
     with np.errstate(invalid="ignore", divide="ignore"):
         resampled_spent = draws @ sums["spent"]
         resampled_miss = (draws @ sums["miss"]) / resampled_spent
-        resampled_lost = (draws @ (sums["spread"] + sums["fee"] + sums["miss"])) / resampled_spent
+        resampled_lost = (draws @ (sums["half_spread"] + sums["fee"] + sums["miss"])) / resampled_spent
 
     rows = []
     for i, label in enumerate(BAND_LABELS + [ALL_PRICES]):
@@ -252,16 +296,16 @@ def cost_table(df, contracts=ORDER_SIZE, resamples=RESAMPLES, seed=SEED):
         spent = total["spent"]
         miss_low, miss_high = np.nanpercentile(resampled_miss[:, i], [2.5, 97.5])
         lost_low, lost_high = np.nanpercentile(resampled_lost[:, i], [2.5, 97.5])
-        lost = (total["spread"] + total["fee"] + total["miss"]) / spent
+        lost = (total["half_spread"] + total["fee"] + total["miss"]) / spent
         rows.append({
             "band": label,
             "contracts": n,
             "ask_cents": total["yes_ask"] / n * 100,
             "midpoint_cents": total["midpoint"] / n * 100,
-            "spread_cents": total["spread"] / n * 100,
+            "half_spread_cents": total["half_spread"] / n * 100,
             "fee_cents": total["fee"] / n * 100,
             "midpoint_miss_cents": total["miss"] / n * 100,
-            "lost_to_spread": total["spread"] / spent,
+            "lost_to_half_spread": total["half_spread"] / spent,
             "lost_to_fee": total["fee"] / spent,
             "lost_to_midpoint": total["miss"] / spent,
             "lost_to_midpoint_low": miss_low,
@@ -380,6 +424,41 @@ def sensitivity_table(df, contracts=ORDER_SIZE):
     return pd.DataFrame(rows)
 
 
+def weighting_table(df, contracts=ORDER_SIZE):
+    """The headline results with each contract counted once (the main results), then with each
+    player-game given equal weight, then each game. A player with a long ladder of lines, or a
+    game with many players listed, counts for more in the main results; this shows how much
+    that matters."""
+    df = df[df["midpoint"].notna()].assign(one=1.0)
+    df["spent"] = df["yes_ask"] + df["yes_ask"].map(lambda p: fee_per_contract(p, contracts))
+    df["profit"] = df["happened"] - df["spent"]
+    df["miss"] = df["midpoint"] - df["happened"]
+    df["gap"] = df["happened"] - df["midpoint"]
+    under5 = df["band"] == "under 5c"
+
+    results = [
+        ("return_all", "Return from buying YES, all prices", "%", df, "profit", "spent"),
+        ("midpoint_all", "Midpoint error as a share of money spent, all prices", "%", df, "miss", "spent"),
+        ("gap_all", "Actual minus expected, all contracts", "points", df, "gap", "one"),
+        ("gap_under5", "Actual minus expected, under 5c", "points", df[under5], "gap", "one"),
+    ]
+    rows = []
+    for key, name, unit, part, top, bottom in results:
+        if part.empty:
+            continue
+        # a contract's weight is 1 / (number of contracts sharing its player-game, or its game)
+        weights = {
+            "by_contract": pd.Series(1.0, index=part.index),
+            "each_player_game_equal": 1 / part.groupby(["game_id", "player"])["one"].transform("sum"),
+            "each_game_equal": 1 / part.groupby("game_id")["one"].transform("sum"),
+        }
+        row = {"key": key, "result": name, "unit": unit}
+        for weighting, w in weights.items():
+            row[weighting] = (w * part[top]).sum() / (w * part[bottom]).sum()
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def order_size_table(df, sizes=(100, 10, 1)):
     """The return from buying YES at different order sizes. Kalshi rounds the fee up to the next
     cent on the whole order, so the fee per contract is higher on small orders."""
@@ -442,9 +521,9 @@ def show_cost(table):
         "band": table["band"],
         "contracts": table["contracts"],
         "ask c": table["ask_cents"].round(1),
-        "spread c": table["spread_cents"].round(2),
+        "half-spread c": table["half_spread_cents"].round(2),
         "fee c": table["fee_cents"].round(2),
-        "spread %": (table["lost_to_spread"] * 100).round(1),
+        "half-spread %": (table["lost_to_half_spread"] * 100).round(1),
         "fee %": (table["lost_to_fee"] * 100).round(1),
         "midpoint %": (table["lost_to_midpoint"] * 100).round(1),
         "midpoint range": _range(table["lost_to_midpoint_low"], table["lost_to_midpoint_high"]),
@@ -523,7 +602,7 @@ def _span(low, high, unit=""):
     return f"{low * 100:+.1f}{unit} to {high * 100:+.1f}{unit}"
 
 
-def key_numbers(raw, df, bands, costs, accuracy, rare, distance, sensitivity, order_sizes):
+def key_numbers(df, quality, bands, costs, accuracy, rare, distance, sensitivity, order_sizes, weighting):
     """The headline figures as text, on all scans. The one-page PDF is filled from these and a
     test checks that the README quotes every one, so no number in either is typed by hand."""
     kickoff = pd.to_datetime(df["game_time"], utc=True).dt.tz_convert("America/New_York")
@@ -545,13 +624,16 @@ def key_numbers(raw, df, bands, costs, accuracy, rare, distance, sensitivity, or
     median_hours = with_midpoint.groupby("league")["hours_before"].median()
     dropped = sensitivity.set_index("key")
     sizes_under5 = order_sizes.set_index("band").loc["under 5c"]
+    weighted = weighting.set_index("key")
 
     def without_one_game(key, unit=""):
         return _span(dropped.loc[key, "lowest_without_one_game"], dropped.loc[key, "highest_without_one_game"], unit)
 
     return {
-        "rows_read": f"{len(raw):,}",
-        "left_out_part_way": f"{len(raw) - len(df):,}",
+        "rows_read": f"{quality['rows_read'].sum():,}",
+        "left_out_part_way": f"{quality['settled_part_way'].sum():,}",
+        "logged_after_start": f"{quality['logged_after_start'].sum():,}",
+        "duplicate_tickers": f"{int(quality['duplicate_tickers'].fillna(0).sum()):,}",
         "contracts": f"{int(cost_all['contracts']):,}",
         "games": str(df["game_id"].nunique()),
         "nfl_games": str(df[df["league"] == "NFL"]["game_id"].nunique()),
@@ -585,24 +667,26 @@ def key_numbers(raw, df, bands, costs, accuracy, rare, distance, sensitivity, or
 
         "return_all": _pct(cost_all["return"], signed=True),
         "return_all_range": _span(cost_all["return_low"], cost_all["return_high"], "%"),
-        "spread_all": _pct(cost_all["lost_to_spread"]),
+        "half_spread_all": _pct(cost_all["lost_to_half_spread"]),
         "fee_all": _pct(cost_all["lost_to_fee"]),
         "midpoint_all": _pct(cost_all["lost_to_midpoint"]),
         "midpoint_all_range": _span(cost_all["lost_to_midpoint_low"], cost_all["lost_to_midpoint_high"], "%"),
-        "known_share_of_loss": f"{(cost_all['lost_to_spread'] + cost_all['lost_to_fee']) / -cost_all['return'] * 100:.0f}%",
+        "known_share_of_loss": f"{(cost_all['lost_to_half_spread'] + cost_all['lost_to_fee']) / -cost_all['return'] * 100:.0f}%",
         "return_under5": _pct(cost_under5["return"], signed=True),
-        "spread_under5": _pct(cost_under5["lost_to_spread"]),
+        "half_spread_under5": _pct(cost_under5["lost_to_half_spread"]),
         "return_80_up": _pct(cost_80["return"], signed=True),
         "nfl_midpoint_under5": _pct(nfl_cost_under5["lost_to_midpoint"], signed=True),
-        "nba_spread_under5": _pct(nba_cost_under5["lost_to_spread"]),
+        "nba_half_spread_under5": _pct(nba_cost_under5["lost_to_half_spread"]),
         "nba_midpoint_under5": _pct(nba_cost_under5["lost_to_midpoint"]),
-        "nfl_spread_cents": f"{_row(costs, 'NFL', band=ALL_PRICES)['spread_cents']:.1f}",
-        "nba_spread_cents": f"{_row(costs, 'NBA', band=ALL_PRICES)['spread_cents']:.1f}",
+        "nfl_half_spread_cents": f"{_row(costs, 'NFL', band=ALL_PRICES)['half_spread_cents']:.1f}",
+        "nba_half_spread_cents": f"{_row(costs, 'NBA', band=ALL_PRICES)['half_spread_cents']:.1f}",
 
         "return_all_without_one_game": without_one_game("return_all", "%"),
         "return_under5_without_one_game": without_one_game("return_under5", "%"),
         "nba_under5_gap_without_one_game": without_one_game("nba_under5_gap"),
         "nfl_book_rare_gap_without_one_game": without_one_game("nfl_book_rare_gap"),
+        "return_all_each_player_game_equal": _pct(weighted.loc["return_all", "each_player_game_equal"], signed=True),
+        "return_all_each_game_equal": _pct(weighted.loc["return_all", "each_game_equal"], signed=True),
         "return_under5_no_fee": _pct(sizes_under5["no_fee"], signed=True),
         "return_under5_100_contracts": _pct(sizes_under5["contracts_100"], signed=True),
         "return_under5_1_contract": _pct(sizes_under5["contracts_1"], signed=True),
@@ -629,7 +713,7 @@ def _md(headers, rows):
     return "\n".join(lines)
 
 
-def markdown_tables(bands, costs, accuracy, rare, distance, sensitivity, order_sizes):
+def markdown_tables(quality, bands, costs, accuracy, rare, distance, sensitivity, order_sizes, weighting):
     """The tables shown in the README, as Markdown, so they are copied and never retyped."""
     def gap(row, name="gap"):
         return f"{_signed(row[name] * 100)} ({_span(row[name + '_low'], row[name + '_high'])})"
@@ -651,12 +735,12 @@ def markdown_tables(bands, costs, accuracy, rare, distance, sensitivity, order_s
             ["Price band", "NFL gap in points (95% range)", "NBA gap in points (95% range)"],
             [[b, gap(_row(bands, "NFL", band=b)), gap(_row(bands, "NBA", band=b))] for b in BAND_LABELS]),
         "Where a YES buyer's money went, both leagues": _md(
-            ["Price band", "Average ask", "Spread", "Fee", "Midpoint error (95% range)", "Return (95% range)"],
-            [[r["band"], f"{r['ask_cents']:.1f}c", _pct(r["lost_to_spread"]), _pct(r["lost_to_fee"]),
+            ["Price band", "Average ask", "Half-spread", "Fee", "Midpoint error (95% range)", "Return (95% range)"],
+            [[r["band"], f"{r['ask_cents']:.1f}c", _pct(r["lost_to_half_spread"]), _pct(r["lost_to_fee"]),
               money(r, "lost_to_midpoint"), money(r, "return")] for r in pooled_costs]),
         "Longshot cost by league": _md(
-            ["League", "Price band", "Spread", "Fee", "Midpoint error (95% range)", "Return (95% range)"],
-            [[league, r["band"], _pct(r["lost_to_spread"]), _pct(r["lost_to_fee"]), money(r, "lost_to_midpoint"),
+            ["League", "Price band", "Half-spread", "Fee", "Midpoint error (95% range)", "Return (95% range)"],
+            [[league, r["band"], _pct(r["lost_to_half_spread"]), _pct(r["lost_to_fee"]), money(r, "lost_to_midpoint"),
               money(r, "return")] for league in ["NFL", "NBA"]
              for r in [_row(costs, league, band=b) for b in BAND_LABELS[:2]]]),
         "Overall accuracy (Brier score)": _md(
@@ -682,6 +766,25 @@ def markdown_tables(bands, costs, accuracy, rare, distance, sensitivity, order_s
     def in_unit(x, unit):
         return {"%": _pct(x, signed=True), "points": _signed(x * 100), "Brier": _signed(x, 4)}[unit]
 
+    checks = [("Rows read", "rows_read"), ("Logged after the game started (left out)", "logged_after_start"),
+              ("Settled part-way (left out)", "settled_part_way"), ("Not settled yet (left out)", "not_settled"),
+              ("Settled yes or no", "settled_yes_or_no"), ("No price to sell YES, so no midpoint", "no_price_to_sell"),
+              ("In the analysis", "in_the_analysis"), ("Duplicate tickers", "duplicate_tickers"),
+              ("Games", "games"), ("Player-games", "player_games"),
+              ("First game", "first_game"), ("Last game", "last_game")]
+    by_league = quality.set_index("league")
+
+    def cell(value):
+        return f"{int(value):,}" if isinstance(value, (int, float, np.integer, np.floating)) and pd.notna(value) else str(value)
+
+    tables["Data checks"] = _md(["Check"] + list(by_league.index),
+                                [[label] + [cell(by_league.loc[league, column]) for league in by_league.index]
+                                 for label, column in checks])
+    tables["Results under different weightings"] = _md(
+        ["Result", "Each contract counted once", "Each player-game equal", "Each game equal"],
+        [[r["result"] + (f" ({r['unit']})" if r["unit"] != "%" else ""), in_unit(r["by_contract"], r["unit"]),
+          in_unit(r["each_player_game_equal"], r["unit"]), in_unit(r["each_game_equal"], r["unit"])]
+         for _, r in weighting.iterrows()])
     tables["One game dropped at a time"] = _md(
         ["Result", "Games", "Full sample", "Lowest with one game dropped", "Highest with one game dropped"],
         [[r["result"] + (f" ({r['unit']})" if r["unit"] != "%" else ""), r["games"], in_unit(r["full_sample"], r["unit"]),
@@ -718,14 +821,16 @@ def write_summary_pdf(n, charts, path):
                 f"{n['under5_expected']} on average, the true rate could be {n['under5_plausible_low']} to "
                 f"{n['under5_plausible_high']}.",
                 "actual_vs_expected.png", 9 / 5),
-        finding("2. What buyers lost was mostly the cost of trading.",
-                f"Buying YES on every contract returned {n['return_all']} ({n['return_all_range']}). Of each "
-                f"dollar spent, {n['spread_all']} went to the spread, {n['fee_all']} to the fee on a "
+        finding("2. What a buyer would have lost was mostly the cost of trading.",
+                f"Buying YES on every contract at the quoted ask and holding to settlement would have returned "
+                f"{n['return_all']} ({n['return_all_range']}). Of each dollar spent, {n['half_spread_all']} went "
+                f"to the half-spread (the ask minus the midpoint), {n['fee_all']} to the fee on a "
                 f"{ORDER_SIZE}-contract order, and {n['midpoint_all']} ({n['midpoint_all_range']}) to the midpoint "
-                f"being too high. The spread and fee, both known before buying, were {n['known_share_of_loss']} "
-                f"of the loss. Longshots cost the most: under 5 cents the spread alone took {n['spread_under5']} "
-                f"and buyers returned {n['return_under5']}, against {n['return_80_up']} at 80 cents and up. "
-                f"Dropping any one game leaves the overall return in the range {n['return_all_without_one_game']}.",
+                f"being too high. The half-spread and fee, both known before buying, were "
+                f"{n['known_share_of_loss']} of the loss. Longshots cost the most: under 5 cents the half-spread "
+                f"alone took {n['half_spread_under5']} and the return was {n['return_under5']}, against "
+                f"{n['return_80_up']} at 80 cents and up. Dropping any one game leaves the overall return in the "
+                f"range {n['return_all_without_one_game']}.",
                 "cost_split.png", 11 / 5),
         finding("3. Kalshi matched a sportsbook-based curve, except on rare outcomes.",
                 f"Overall accuracy was a tie: a Brier score of {n['brier_kalshi']} for Kalshi's midpoint and "
@@ -748,7 +853,7 @@ def write_summary_pdf(n, charts, path):
         Spacer(1, 9),
         Paragraph(f"<b>Bottom line.</b> The data shows no measurable gap between Kalshi's prices and outcomes. "
                   f"Measured at the midpoint between the buy and sell price, contracts paid out within a few "
-                  f"points of what the price implied, and what buyers lost was mostly the spread and the fee. "
+                  f"points of what the price implied, and what a buyer would have lost was mostly the half-spread and the fee. "
                   f"With only {n['games']} games, a gap of up to {n['pooled_widest_bound']} points in a price band "
                   f"cannot be ruled out, so every result is reported with a range.", body),
         Spacer(1, 10),
@@ -759,7 +864,8 @@ def write_summary_pdf(n, charts, path):
                   "player's contracts in a game win or lose together. The sportsbook curve was set from earlier "
                   "seasons and not changed during the sample. "
                   "<b>Limits.</b> Five weeks of one season; games I chose to scan; the YES side only; contracts "
-                  "settled part-way are left out. This is a study of prices, not betting advice. "
+                  "settled part-way are left out. Returns are hypothetical, at quoted prices, with no data on how "
+                  "many contracts were on offer. This is a study of prices, not betting advice. "
                   "The analysis code is covered by tests.", small),
     ]
     doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.55 * inch, rightMargin=0.55 * inch,
@@ -811,14 +917,15 @@ def chart_actual_vs_expected(tables, path):
 
 
 def chart_cost_split(tables, path):
-    """Chart 2: for each league, the known cost of buying YES (spread + fee, stacked bars)
-    against what buyers actually lost (dots with 95% ranges), as a share of the money spent."""
+    """Chart 2: for each league, the known cost of buying YES (half-spread + fee, stacked bars)
+    against what a buyer at the quoted ask would have lost (dots with 95% ranges), as a share of
+    the money spent."""
     fig, axes = plt.subplots(1, 2, figsize=(11, 5), sharey=True, facecolor=SURFACE)
     x = np.arange(len(BAND_LABELS))
 
     for ax, league in zip(axes, ["NFL", "NBA"]):
         t = tables[(tables["sample"] == league) & (tables["scans"] == "all")].set_index("band").reindex(BAND_LABELS)
-        spread = t["lost_to_spread"].to_numpy() * 100
+        spread = t["lost_to_half_spread"].to_numpy() * 100
         fee = t["lost_to_fee"].to_numpy() * 100
         lost = -t["return"].to_numpy() * 100
         lost_low = -t["return_high"].to_numpy() * 100
@@ -827,11 +934,11 @@ def chart_cost_split(tables, path):
         _style(ax)
         ax.axhline(0, color=MUTED, linewidth=1)
         # the surface-colored edge leaves a thin gap between the two stacked parts
-        ax.bar(x, spread, width=0.6, color=SPREAD_COLOR, edgecolor=SURFACE, linewidth=1.5, label="Spread")
+        ax.bar(x, spread, width=0.6, color=SPREAD_COLOR, edgecolor=SURFACE, linewidth=1.5, label="Half-spread")
         ax.bar(x, fee, width=0.6, bottom=spread, color=FEE_COLOR, edgecolor=SURFACE, linewidth=1.5, label="Fee")
         ax.errorbar(x, lost, yerr=[lost - lost_low, lost_high - lost], fmt="o", color=INK, markersize=8,
                     markeredgecolor=SURFACE, markeredgewidth=2, elinewidth=2, capsize=0,
-                    label="What buyers lost (95% range)")
+                    label="What a buyer would have lost (95% range)")
         ax.set_xticks(x)
         ax.set_xticklabels(BAND_LABELS, color=MUTED, fontsize=9)
         ax.set_title(league, loc="left", fontsize=11, fontweight="bold", color=INK)
@@ -839,9 +946,10 @@ def chart_cost_split(tables, path):
     axes[0].set_ylabel("Share of the money spent (%)", color=MUTED)
     axes[0].legend(loc="upper right", frameon=False, labelcolor=INK)
     fig.supxlabel("Price band (midpoint between the buy and sell price)", color=MUTED, fontsize=10)
-    fig.suptitle("Where a YES buyer's money went", x=0.06, y=0.97, ha="left",
+    fig.suptitle("Where a YES buyer's money would have gone", x=0.06, y=0.97, ha="left",
                  fontsize=14, fontweight="bold", color=INK)
-    fig.text(0.06, 0.84, f"Bars are the cost known when buying: the spread plus the fee on a {ORDER_SIZE}-contract order.\n"
+    fig.text(0.06, 0.84, f"Bars are the cost known when buying at the quoted ask: the half-spread plus the fee on a "
+             f"{ORDER_SIZE}-contract order.\n"
              "A dot above its bar means the midpoint was too high as well.", fontsize=10, color=MUTED, linespacing=1.5)
     fig.tight_layout(rect=(0, 0, 1, 0.84))
     fig.savefig(path, dpi=200, facecolor=SURFACE)
@@ -889,13 +997,12 @@ def main(argv=None):
     parser.add_argument("--out", default=str(Path(__file__).parent), help="folder for output/ and charts/")
     args = parser.parse_args(argv)
 
-    raw = load({"NFL": args.nfl_csv, "NBA": args.nba_csv})
+    paths = {"NFL": args.nfl_csv, "NBA": args.nba_csv}
+    raw = load(paths)
     df = prepare(raw)
-    with_mid = df[df["midpoint"].notna()]
-    print(f"Rows read: {len(raw):,}. Settled part-way and left out: {len(raw) - len(df):,}. "
-          f"Settled yes or no: {len(df):,}, of which {len(with_mid):,} have a midpoint.")
-    print(f"Games: {df['game_id'].nunique()}. Player-games: "
-          f"{df.groupby(['game_id', 'player']).ngroups:,}. Fresh scans: {df['fresh'].mean():.0%} of contracts.")
+    quality = data_quality(raw, paths)
+    print("DATA CHECKS\n")
+    print(quality.drop(columns="input_sha256").set_index("league").T.to_string())
 
     bands = all_tables(df, band_table)
     costs = all_tables(df, cost_table)
@@ -904,6 +1011,7 @@ def main(argv=None):
     distance = all_tables(df, distance_table)
     sensitivity = sensitivity_table(df)
     order_sizes = order_size_table(df)
+    weighting = weighting_table(df)
 
     print("\n\nOVERALL ACCURACY (Brier score, lower is better)\n")
     print(show_accuracy(accuracy))
@@ -918,6 +1026,8 @@ def main(argv=None):
             print(render(table))
     print("\n\nONE GAME DROPPED AT A TIME (% and points are shown as fractions)\n")
     print(sensitivity.drop(columns="key").round(4).to_string(index=False))
+    print("\n\nRESULTS UNDER DIFFERENT WEIGHTINGS (% and points are shown as fractions)\n")
+    print(weighting.drop(columns="key").round(4).to_string(index=False))
     print("\n\nRETURN FROM BUYING YES, BY ORDER SIZE (both leagues, as fractions)\n")
     print(order_sizes.round(3).to_string(index=False))
 
@@ -926,16 +1036,17 @@ def main(argv=None):
     (out / "charts").mkdir(parents=True, exist_ok=True)
     for name, table in [("band_table", bands), ("cost_table", costs), ("accuracy_table", accuracy),
                         ("rare_table", rare), ("distance_table", distance),
-                        ("sensitivity_table", sensitivity), ("order_size_table", order_sizes)]:
+                        ("sensitivity_table", sensitivity), ("order_size_table", order_sizes),
+                        ("weighting_table", weighting), ("data_quality", quality)]:
         table.to_csv(out / "output" / f"{name}.csv", index=False)
     chart_actual_vs_expected(bands, out / "charts" / "actual_vs_expected.png")
     chart_cost_split(costs, out / "charts" / "cost_split.png")
     chart_kalshi_vs_book(distance, out / "charts" / "kalshi_vs_book_curve.png")
 
-    numbers = key_numbers(raw, df, bands, costs, accuracy, rare, distance, sensitivity, order_sizes)
+    numbers = key_numbers(df, quality, bands, costs, accuracy, rare, distance, sensitivity, order_sizes, weighting)
     (out / "output" / "key_numbers.json").write_text(json.dumps(numbers, indent=2) + "\n")
     (out / "output" / "tables.md").write_text(
-        markdown_tables(bands, costs, accuracy, rare, distance, sensitivity, order_sizes))
+        markdown_tables(quality, bands, costs, accuracy, rare, distance, sensitivity, order_sizes, weighting))
     write_summary_pdf(numbers, out / "charts", out / "one_page_summary.pdf")
     print(f"\nSaved tables to {out / 'output'}, charts to {out / 'charts'} and {out / 'one_page_summary.pdf'}")
 

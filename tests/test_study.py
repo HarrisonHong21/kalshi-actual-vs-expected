@@ -87,10 +87,10 @@ def test_cost_split_numbers():
     table = study.cost_table(prepared(four_contracts_at_30c()), contracts=10, resamples=50)
     row = table[table["band"] == "20-50c"].iloc[0]
     spent = 0.32 + 0.016
-    assert row["spread_cents"] == pytest.approx(2.0)
+    assert row["half_spread_cents"] == pytest.approx(2.0)
     assert row["fee_cents"] == pytest.approx(1.6)
     assert row["midpoint_miss_cents"] == pytest.approx(5.0)   # priced at 30%, happened 25%
-    assert row["lost_to_spread"] == pytest.approx(0.02 / spent)
+    assert row["lost_to_half_spread"] == pytest.approx(0.02 / spent)
     assert row["lost_to_fee"] == pytest.approx(0.016 / spent)
     assert row["lost_to_midpoint"] == pytest.approx(0.05 / spent)
     assert row["return"] == pytest.approx((0.25 - spent) / spent)
@@ -103,7 +103,7 @@ def test_the_three_parts_add_up_to_the_loss():
              contract("g3", 0.90, 0.13, "yes"), contract("g3", 0.55, 0.47, "no")]
     df = prepared(rows)
     table = study.cost_table(df, resamples=50)
-    parts = table["lost_to_spread"] + table["lost_to_fee"] + table["lost_to_midpoint"]
+    parts = table["lost_to_half_spread"] + table["lost_to_fee"] + table["lost_to_midpoint"]
     assert (parts + table["return"]).abs().max() < 1e-12
     # the "all prices" row is the same as buying every contract
     everything = table[table["band"] == study.ALL_PRICES].iloc[0]
@@ -283,3 +283,41 @@ def test_whole_study_runs_on_the_made_up_sample_data(tmp_path):
                  "charts/actual_vs_expected.png", "charts/cost_split.png", "charts/kalshi_vs_book_curve.png",
                  "one_page_summary.pdf"]:
         assert (tmp_path / name).stat().st_size > 0, name
+
+
+def test_prices_logged_after_the_start_are_left_out():
+    rows = [contract("g1", 0.31, 0.71, "yes", hours_before=0.0),     # logged exactly at the start: kept
+            contract("g1", 0.31, 0.71, "yes", hours_before=1.0),
+            contract("g1", 0.95, 0.07, "yes", hours_before=-0.5)]    # logged half an hour into the game
+    df = prepared(rows)
+    assert len(df) == 2
+    assert (df["hours_before"] >= 0).all()
+    assert df["yes_ask"].max() == pytest.approx(0.31)
+
+
+def test_data_checks_account_for_every_row():
+    rows = [contract("g1", 0.31, 0.71, "yes"), contract("g1", 0.31, 0.71, "no"),
+            contract("g1", 0.31, None, "no"),                        # nobody selling NO: no midpoint
+            contract("g1", 0.31, 0.71, "scalar"),                    # settled part-way
+            contract("g1", 0.31, 0.71, None),                        # not settled yet
+            contract("g1", 0.95, 0.07, "yes", hours_before=-1.0)]    # logged after the start
+    raw = pd.DataFrame(rows).assign(ticker=["a", "b", "c", "d", "e", "e"])
+    row = study.data_quality(raw).iloc[0]
+    assert row["rows_read"] == 6
+    assert (row["logged_after_start"], row["settled_part_way"], row["not_settled"]) == (1, 1, 1)
+    assert (row["settled_yes_or_no"], row["no_price_to_sell"], row["in_the_analysis"]) == (3, 1, 2)
+    assert row["duplicate_tickers"] == 1
+    left_out = row["logged_after_start"] + row["settled_part_way"] + row["not_settled"]
+    assert left_out + row["settled_yes_or_no"] == row["rows_read"]
+
+
+def test_equal_weighting_of_player_games_and_games():
+    # Player A has three 50c contracts that all pay out; player B, in another game, has one that
+    # does not. Counting contracts, 3 of 4 paid out (+25 points against 50% expected). Giving
+    # each player-game, or each game, equal weight it is 1 of 2 (0 points).
+    rows = [contract("g1", 0.51, 0.51, "yes", player="A") for _ in range(3)]
+    rows += [contract("g2", 0.51, 0.51, "no", player="B")]
+    gap = study.weighting_table(prepared(rows)).set_index("key").loc["gap_all"]
+    assert gap["by_contract"] == pytest.approx(0.25)
+    assert gap["each_player_game_equal"] == pytest.approx(0.0)
+    assert gap["each_game_equal"] == pytest.approx(0.0)

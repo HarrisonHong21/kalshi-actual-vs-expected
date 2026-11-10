@@ -22,7 +22,7 @@
 
 ## Where a YES buyer's money went, both leagues
 
-| Price band | Average ask | Spread | Fee | Midpoint error (95% range) | Return (95% range) |
+| Price band | Average ask | Half-spread | Fee | Midpoint error (95% range) | Return (95% range) |
 |---|---|---|---|---|---|
 | under 5c | 4.8c | 24.4% | 7.1% | +7.7% (-13.4% to +28.6%) | -39.2% (-60.4% to -17.9%) |
 | 5-10c | 8.7c | 17.3% | 6.5% | +3.0% (-13.7% to +17.9%) | -26.7% (-41.2% to -10.5%) |
@@ -34,7 +34,7 @@
 
 ## Longshot cost by league
 
-| League | Price band | Spread | Fee | Midpoint error (95% range) | Return (95% range) |
+| League | Price band | Half-spread | Fee | Midpoint error (95% range) | Return (95% range) |
 |---|---|---|---|---|---|
 | NFL | under 5c | 21.9% | 7.2% | -2.5% (-31.4% to +23.0%) | -26.5% (-51.8% to +2.7%) |
 | NFL | 5-10c | 15.3% | 6.5% | -3.3% (-25.4% to +15.5%) | -18.4% (-36.8% to +3.1%) |
@@ -78,6 +78,32 @@
 | NBA | 0-1 above | 2,080 | 25.7% | 27.1% | 29.6% | -1.4 (-4.4 to +1.7) | -3.8 (-6.7 to -0.8) |
 | NBA | 1-2 above | 1,294 | 5.6% | 8.2% | 9.6% | -2.6 (-3.9 to -1.0) | -4.0 (-5.3 to -2.5) |
 | NBA | 2+ above | 210 | 1.0% | 3.8% | 2.7% | -2.8 (-4.3 to -1.2) | -1.7 (-2.7 to -0.2) |
+
+## Data checks
+
+| Check | NFL | NBA |
+|---|---|---|
+| Rows read | 11,547 | 6,443 |
+| Logged after the game started (left out) | 0 | 0 |
+| Settled part-way (left out) | 49 | 56 |
+| Not settled yet (left out) | 0 | 0 |
+| Settled yes or no | 11,498 | 6,387 |
+| No price to sell YES, so no midpoint | 95 | 137 |
+| In the analysis | 11,403 | 6,250 |
+| Duplicate tickers | 0 | 0 |
+| Games | 49 | 39 |
+| Player-games | 671 | 448 |
+| First game | 2026-10-05 | 2026-10-20 |
+| Last game | 2026-11-09 | 2026-11-07 |
+
+## Results under different weightings
+
+| Result | Each contract counted once | Each player-game equal | Each game equal |
+|---|---|---|---|
+| Return from buying YES, all prices | -9.9% | -9.2% | -10.0% |
+| Midpoint error as a share of money spent, all prices | +2.5% | +1.2% | +1.3% |
+| Actual minus expected, all contracts (points) | -1.0 | -0.5 | -0.5 |
+| Actual minus expected, under 5c (points) | -0.4 | -0.6 | -0.5 |
 
 ## One game dropped at a time
 
