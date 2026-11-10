@@ -4,6 +4,8 @@
 
 A one-page version is in [one_page_summary.pdf](one_page_summary.pdf).
 
+![tests](https://github.com/HarrisonHong21/kalshi-actual-vs-expected/actions/workflows/tests.yml/badge.svg)
+
 ## Summary
 
 A Kalshi contract priced at 10 cents implies about a 10% chance. This study checks that against
@@ -23,6 +25,8 @@ A Kalshi contract priced at 10 cents implies about a 10% chance. This study chec
 
 The sample is small. Only the price bands from 50 cents up reach full credibility, so every
 result below comes with a range, and several things that look like findings are not established.
+Results for a single league are exploratory: with two leagues and several bands, some ranges
+will exclude zero by chance.
 
 This is a study of prices. It contains no picks and is not betting advice.
 
@@ -44,9 +48,10 @@ paying to trade?
   game) and are left out. Of the rest, 17,653 have both a buy and a sell price, so they have a
   midpoint. They cover 88 games (49 NFL, 39 NBA) and 1,119 player-games. The data checks table
   below has the full count.
-- **Collection.** Each scan of a game saves one row per contract with the time of the scan. At
-  least three hours after the start, the app fills in Kalshi's settlement for the same contract
-  ticker. No ticker appears twice.
+- **Collection.** Each scan of a game saves one row per contract with the time of the scan. If a
+  game was scanned more than once before it started, the latest scan replaces the earlier one,
+  and the app does not save prices for a game that has started. At least three hours after the
+  start, it fills in Kalshi's settlement for the same contract ticker. No ticker appears twice.
 - **Timing.** Prices were logged a median of 1.5 hours before the start for NFL games and 3.2
   hours for NBA games. 78% of contracts were logged within 6 hours of the start, and the longest
   gap was 117 hours. The data records when the app read each price, not when the quote was last
@@ -73,10 +78,29 @@ which identifies the exact data behind these results.
 | No price to sell YES, so no midpoint | 95 | 137 |
 | In the analysis | 11,403 | 6,250 |
 | Duplicate tickers | 0 | 0 |
+| Book-curve version stamped on the rows | 2026-10-05.1 | 2026-10-05.1 |
 | Games | 49 | 39 |
 | Player-games | 671 | 448 |
 | First game | 2026-10-05 | 2026-10-20 |
 | Last game | 2026-11-09 | 2026-11-07 |
+
+The script also stops with an error if a price is blank or outside 0 to 1, if a price to buy
+YES is below the price to sell it, or if a result is not yes, no or scalar.
+
+**Who was left out for having no midpoint.** 232 settled contracts had a price to buy YES but
+nobody offering to buy it from you, so there is no price to sell and no midpoint.
+
+| League | Group | Contracts | Average ask | Asking under 10c | Paid out | Book curve said |
+|---|---|---|---|---|---|---|
+| NFL | In the analysis | 11,403 | 33.5c | 22.1% | 31.2% | 31.5% |
+| NFL | Left out: no price to sell YES | 95 | 5.6c | 95.8% | 2.1% | 2.8% |
+| NBA | In the analysis | 6,250 | 43.0c | 12.4% | 39.7% | 42.8% |
+| NBA | Left out: no price to sell YES | 137 | 7.6c | 75.2% | 6.6% | 5.7% |
+
+- **They are mostly longshots.** 95.8% of the NFL ones and 75.2% of the NBA ones were asking
+  under 10c, and they rarely paid out.
+- **What that means for the results.** The study describes contracts with a quote on both
+  sides. The thinnest longshots, where a buyer faces the worst terms, are under-represented.
 
 ## Method
 
@@ -90,12 +114,13 @@ which identifies the exact data behind these results.
 - **Price bands.** Under 5c, 5-10c, 10-20c, 20-50c, 50-80c, and 80c and up, by midpoint.
 - **Ranges.** A player's contracts in one game win or lose together, so the contracts are not
   independent. Every 95% range comes from resampling whole games 2,000 times and keeping each
-  game's contracts together. That made the ranges 1.1 to 2.0 times wider than treating contracts
-  as independent would.
+  game's contracts together. The standard error of each band's gap from that resampling was 1.1
+  to 2.0 times the standard error that independent contracts would give.
 - **Credibility.** The classical standard of 1,082 expected events for full credibility, applied
-  to a yes-or-no outcome, then reduced for the clustering by game.
-- **Fixed in advance.** The bands, the return formula and the 6-hour cutoff for a "fresh" scan are
-  constants at the top of the script. They were set at the start and not tuned to the results.
+  to a yes-or-no outcome. It means a 90% chance of being within 5% of the true rate, which is a
+  different yardstick from the 95% ranges; the two are reported side by side, not combined. The
+  "by game" figure is an approximation: it shrinks the number of contracts by the square of the
+  standard-error ratio above.
 - **Return.** A hypothetical: buy one order of every contract at the quoted ask, pay the fee, and
   hold to settlement. It is not a record of trades, and the data does not say how many contracts
   were on offer at the ask.
@@ -104,6 +129,26 @@ which identifies the exact data behind these results.
   all ten contract series in this data with its standard fee formula and a multiplier of 1. The
   study uses a 10-contract order, chosen after seeing how much the rounding matters on a single
   contract. The robustness section shows other order sizes.
+
+## What was decided when
+
+Nothing in this study was registered in advance. The project was first published in a single
+commit, so there is no dated record of the order of decisions. This is my own account of it.
+
+Chosen at the first look at the data and not changed since:
+
+- the six price bands;
+- the midpoint as the expected chance;
+- the return formula: buy at the ask, pay the fee, hold to settlement;
+- resampling whole games for every range;
+- the 6-hour cutoff for a "fresh" scan.
+
+Chosen later, after seeing results:
+
+- the 10-contract order size for the fee;
+- the 5% line for a rare outcome and the distance bands in finding 3;
+- the cost-of-trading yardstick in finding 1;
+- every check in the robustness section.
 
 ## Findings
 
@@ -124,10 +169,24 @@ which identifies the exact data behind these results.
 - **What that does and doesn't show.** A range that includes zero means the data found no gap,
   not that there is none. The ranges allow a gap of up to 4.5 points in a band. Contracts under
   5c were priced at 3.6% on average, and their true payout rate could be anywhere from 2.1% to 4.3%.
+- **Is any gap big enough to matter?** One yardstick is the cost of trading one contract, the
+  half-spread plus the fee: a gap smaller than that could not be traded on at a profit. In 2 of
+  6 bands the whole range sits inside that cost. In the other four the range is too wide to rule
+  out a gap larger than the cost of trading.
+
+| Price band | Gap in points (95% range) | Cost of trading one contract, points | Range inside the cost? |
+|---|---|---|---|
+| under 5c | -0.4 (-1.5 to +0.7) | 1.6 | yes |
+| 5-10c | -0.3 (-1.7 to +1.3) | 2.2 | yes |
+| 10-20c | -0.7 (-2.6 to +1.3) | 2.5 | no |
+| 20-50c | -2.0 (-4.5 to +0.3) | 3.0 | no |
+| 50-80c | -1.1 (-3.9 to +1.4) | 3.6 | no |
+| 80c and up | +0.9 (-2.0 to +3.3) | 3.1 | no |
+
 - **Credibility is low for longshots.** The under-5c band has 0.23 of full credibility if
   contracts were independent and 0.18 by game. The 5-10c band has 0.43 and 0.29.
 
-The two leagues differ:
+The two leagues differ. These league results are exploratory:
 
 | Price band | NFL gap in points (95% range) | NBA gap in points (95% range) |
 |---|---|---|
@@ -197,6 +256,21 @@ The curve's widths were set from earlier seasons: the NFL ones before the first 
 the NBA ones two weeks before the first NBA game. They were not changed during the sample, so
 every game here is one the curve had not seen.
 
+The curve, for the record:
+
+- **Yards and points** use a bell curve centred on the middle of the sportsbooks' lines. Its
+  width is a base plus a share of that middle: passing yards 50 + 0.10 x the middle, rushing
+  yards 12 + 0.33 x, receiving yards 12 + 0.40 x, rushing plus receiving yards 16 + 0.28 x, and
+  NBA points 4.0 + 0.18 x.
+- **Counts** use a count curve whose variance is a multiple of its average: receptions 1.2,
+  rebounds 1.4, assists 1.25, three-pointers 1.2, and passing touchdowns 1.
+- **Dates.** The NFL settings date from 5 October 2026 and the NBA settings from 6 October 2026.
+  Every row in the data carries the same version stamp, 2026-10-05.1.
+- **Timing.** Kalshi's prices were saved within minutes of the sportsbook lines they are compared with.
+
+These settings and dates come from my private app's code and history. They cannot be checked
+from this repository.
+
 **Overall accuracy is a tie.** The Brier score is the average squared miss between the chance
 given and what happened, so lower is better.
 
@@ -229,6 +303,17 @@ given and what happened, so lower is better.
 - **NFL:** events the curve called rare happened 5.5% of the time against 2.3% expected. Kalshi's
   own rare contracts paid out 3.7% against 3.6%.
 - **NBA:** the curve erred the other way, 0.8% against 3.3%, on 3 payouts.
+
+Those rows judge each source on its own set of contracts. On the contracts that both sources
+gave under 5%, the comparison is like for like:
+
+| League | Contracts | Payouts | Paid out | Kalshi midpoint said | Book curve said | Kalshi gap in points (95% range) | Book curve gap in points (95% range) |
+|---|---|---|---|---|---|---|---|
+| NFL | 1,052 | 39 | 3.7% | 3.6% | 1.9% | +0.1 (-1.2 to +1.7) | +1.8 (+0.4 to +3.3) |
+| NBA | 309 | 2 | 0.6% | 3.3% | 3.3% | -2.6 (-3.3 to -1.7) | -2.6 (-3.4 to -1.6) |
+
+- **NFL:** on the same 1,052 contracts, 3.7% paid out. Kalshi said 3.6% and the curve said 1.9%.
+- **NBA:** both sources said 3.3% and 0.6% paid out, on 2 payouts.
 
 The same contracts, grouped by how far the line is from the middle of the sportsbooks' lines
 (in typical game-to-game swings of the stat), show where each source drifts:
@@ -309,7 +394,10 @@ order, so small orders pay more fee per contract.
 
 - **Small sample.** Five weeks of one season and 88 games. Only the bands from 50c up reach full credibility.
 - **Chosen games.** The games are the ones I chose to scan, not a random sample.
-- **Many comparisons.** With two leagues and several bands, a few ranges will exclude zero by chance.
+- **Many comparisons.** With two leagues and several bands, a few ranges will exclude zero by
+  chance. Treat single-league results as exploratory.
+- **Not registered in advance.** Some choices were made after seeing results; the section above lists them.
+- **Quotes on both sides only.** 232 contracts with no price to sell YES are left out, and most are longshots.
 - **YES side only.** YES means the player goes over the line. A NO buyer pays the same
   half-spread in cents, with the midpoint part reversed.
 - **Hypothetical returns.** Returns are at quoted asks with an assumed order size. They are not
@@ -320,7 +408,8 @@ order, so small orders pay more fee per contract.
 - **No order sizes.** The data has prices but not how many contracts were on offer at them.
 - **Resampling is by game.** It does not allow for links between games, such as one player
   appearing in several.
-- **The book curve is mine.** Its misses on rare outcomes say more about the curve than about sportsbooks.
+- **The book curve is mine.** Its misses on rare outcomes say more about the curve than about
+  sportsbooks, and how it was built cannot be checked from this repository.
 
 ## Run it
 
@@ -342,8 +431,11 @@ A `ticker` column is optional and is used to check for duplicates.
 ## What's here
 
 - `study.py`: the whole analysis. It prints every table and writes the files below.
-- `tests/`: tests for each calculation, and a test that every headline number and table row in
-  this README matches the script's output.
+- `tests/`: tests for each calculation on made-up data, a test that runs the whole study on the
+  sample data, and a test that the headline numbers and table rows the script writes appear in
+  this README. That last test catches a README that has drifted from the output. It does not
+  prove the numbers are right: that rests on the calculation tests and on the input checks.
+- `.github/workflows/tests.yml`: runs the tests on GitHub on every push.
 - `output/`: the tables of results as CSV, plus `key_numbers.json` and `tables.md`, which this
   README and the PDF are filled from, and `data_quality.csv`, the record of what was read.
 - `charts/`: the three charts.

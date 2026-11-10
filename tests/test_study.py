@@ -160,7 +160,7 @@ def test_resampling_keeps_each_games_contracts_together():
     assert row["gap"] == pytest.approx(0.0)
     assert row["gap_low"] == pytest.approx(-0.5)
     assert row["gap_high"] == pytest.approx(0.5)
-    assert row["widening"] > 2
+    assert row["standard_error_ratio"] > 2
     assert row["credibility_by_game"] < row["credibility_if_independent"]
 
 
@@ -321,3 +321,63 @@ def test_equal_weighting_of_player_games_and_games():
     assert gap["by_contract"] == pytest.approx(0.25)
     assert gap["each_player_game_equal"] == pytest.approx(0.0)
     assert gap["each_game_equal"] == pytest.approx(0.0)
+
+
+def test_good_input_passes_the_checks():
+    study.validate(pd.DataFrame([contract("g1", 0.31, 0.71, "yes"), contract("g1", 0.31, None, None)]))
+
+
+@pytest.mark.parametrize("change, message", [
+    (dict(yes_ask=0.30, no_ask=0.60), "below the price to sell"),   # sells at 40c but buys at 30c
+    (dict(yes_ask=1.20), "outside 0 to 1"),
+    (dict(result="maybe"), "unknown result"),
+    (dict(books_over=None), "book-curve chance"),
+])
+def test_bad_input_stops_the_study(change, message):
+    row = contract("g1", 0.31, 0.71, "yes")
+    row.update(change)
+    with pytest.raises(ValueError, match=message):
+        study.validate(pd.DataFrame([row]))
+
+
+def test_missing_column_stops_the_study():
+    raw = pd.DataFrame([contract("g1", 0.31, 0.71, "yes")]).drop(columns="line")
+    with pytest.raises(ValueError, match="missing columns"):
+        study.validate(raw)
+
+
+def test_exclusion_table_compares_kept_and_left_out_contracts():
+    rows = [contract("g1", 0.31, 0.71, "yes", books_over=0.3), contract("g1", 0.31, 0.71, "no", books_over=0.3),
+            contract("g1", 0.04, None, "no", books_over=0.02), contract("g1", 0.12, None, "no", books_over=0.04)]
+    table = study.exclusion_table(prepared(rows)).set_index("group")
+    kept, left_out = table.loc["In the analysis"], table.loc["Left out: no price to sell YES"]
+    assert (kept["contracts"], left_out["contracts"]) == (2, 2)
+    assert kept["paid_out"] == pytest.approx(0.5)
+    assert left_out["average_ask"] == pytest.approx(0.08)
+    assert left_out["share_asking_under_10c"] == pytest.approx(0.5)
+    assert left_out["book_curve_said"] == pytest.approx(0.03)
+
+
+def test_tolerance_compares_the_gap_range_with_the_cost_of_trading():
+    def tables(gap_low, gap_high):
+        key = {"sample": study.BOTH, "scans": "all", "band": "20-50c"}
+        bands = pd.DataFrame([{**key, "gap": 0.0, "gap_low": gap_low, "gap_high": gap_high}])
+        costs = pd.DataFrame([{**key, "half_spread_cents": 2.0, "fee_cents": 1.0}])   # 3 points to trade
+        return bands, costs
+
+    inside = study.tolerance_table(*tables(-0.02, 0.025)).iloc[0]
+    assert inside["trading_cost"] == pytest.approx(0.03)
+    assert inside["range_inside_cost"]
+    assert not study.tolerance_table(*tables(-0.04, 0.01)).iloc[0]["range_inside_cost"]
+
+
+def test_rare_same_contracts_uses_only_contracts_both_sources_call_rare():
+    rows = [contract("g1", 0.04, 0.98, "yes", books_over=0.02),   # both under 5%: counted
+            contract("g1", 0.04, 0.98, "no", books_over=0.02),
+            contract("g1", 0.04, 0.98, "no", books_over=0.08),    # only Kalshi under 5%
+            contract("g1", 0.12, 0.90, "no", books_over=0.02)]    # only the book curve under 5%
+    row = study.rare_same_contracts_table(prepared(rows), resamples=50).iloc[0]
+    assert row["contracts"] == 2
+    assert row["actual"] == pytest.approx(0.5)
+    assert row["kalshi_expected"] == pytest.approx(0.03)
+    assert row["book_expected"] == pytest.approx(0.02)

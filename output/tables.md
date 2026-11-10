@@ -91,10 +91,38 @@
 | No price to sell YES, so no midpoint | 95 | 137 |
 | In the analysis | 11,403 | 6,250 |
 | Duplicate tickers | 0 | 0 |
+| Book-curve version stamped on the rows | 2026-10-05.1 | 2026-10-05.1 |
 | Games | 49 | 39 |
 | Player-games | 671 | 448 |
 | First game | 2026-10-05 | 2026-10-20 |
 | Last game | 2026-11-09 | 2026-11-07 |
+
+## Contracts left out for having no midpoint
+
+| League | Group | Contracts | Average ask | Asking under 10c | Paid out | Book curve said |
+|---|---|---|---|---|---|---|
+| NFL | In the analysis | 11,403 | 33.5c | 22.1% | 31.2% | 31.5% |
+| NFL | Left out: no price to sell YES | 95 | 5.6c | 95.8% | 2.1% | 2.8% |
+| NBA | In the analysis | 6,250 | 43.0c | 12.4% | 39.7% | 42.8% |
+| NBA | Left out: no price to sell YES | 137 | 7.6c | 75.2% | 6.6% | 5.7% |
+
+## Gap range against the cost of trading
+
+| Price band | Gap in points (95% range) | Cost of trading one contract, points | Range inside the cost? |
+|---|---|---|---|
+| under 5c | -0.4 (-1.5 to +0.7) | 1.6 | yes |
+| 5-10c | -0.3 (-1.7 to +1.3) | 2.2 | yes |
+| 10-20c | -0.7 (-2.6 to +1.3) | 2.5 | no |
+| 20-50c | -2.0 (-4.5 to +0.3) | 3.0 | no |
+| 50-80c | -1.1 (-3.9 to +1.4) | 3.6 | no |
+| 80c and up | +0.9 (-2.0 to +3.3) | 3.1 | no |
+
+## Rare outcomes on the same contracts
+
+| League | Contracts | Payouts | Paid out | Kalshi midpoint said | Book curve said | Kalshi gap in points (95% range) | Book curve gap in points (95% range) |
+|---|---|---|---|---|---|---|---|
+| NFL | 1,052 | 39 | 3.7% | 3.6% | 1.9% | +0.1 (-1.2 to +1.7) | +1.8 (+0.4 to +3.3) |
+| NBA | 309 | 2 | 0.6% | 3.3% | 3.3% | -2.6 (-3.3 to -1.7) | -2.6 (-3.4 to -1.6) |
 
 ## Results under different weightings
 

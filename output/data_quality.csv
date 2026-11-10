@@ -1,3 +1,3 @@
-league,rows_read,logged_after_start,settled_part_way,not_settled,settled_yes_or_no,no_price_to_sell,in_the_analysis,duplicate_tickers,games,player_games,first_game,last_game,input_sha256
-NFL,11547,0,49,0,11498,95,11403,0,49,671,2026-10-05,2026-11-09,be99e4be39b8fe226a84c66e9b3e676b040a03729fb039cbc4375e8447d91427
-NBA,6443,0,56,0,6387,137,6250,0,39,448,2026-10-20,2026-11-07,9baa296625b2bc13bb643ff6fe3b085e0bd0c8756f7165010e355395dcd653f2
+league,rows_read,logged_after_start,settled_part_way,not_settled,settled_yes_or_no,no_price_to_sell,in_the_analysis,duplicate_tickers,book_curve_versions,games,player_games,first_game,last_game,input_sha256
+NFL,11547,0,49,0,11498,95,11403,0,2026-10-05.1,49,671,2026-10-05,2026-11-09,be99e4be39b8fe226a84c66e9b3e676b040a03729fb039cbc4375e8447d91427
+NBA,6443,0,56,0,6387,137,6250,0,2026-10-05.1,39,448,2026-10-20,2026-11-07,9baa296625b2bc13bb643ff6fe3b085e0bd0c8756f7165010e355395dcd653f2
