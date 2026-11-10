@@ -78,3 +78,26 @@
 | NBA | 0-1 above | 2,080 | 25.7% | 27.1% | 29.6% | -1.4 (-4.4 to +1.7) | -3.8 (-6.7 to -0.8) |
 | NBA | 1-2 above | 1,294 | 5.6% | 8.2% | 9.6% | -2.6 (-3.9 to -1.0) | -4.0 (-5.3 to -2.5) |
 | NBA | 2+ above | 210 | 1.0% | 3.8% | 2.7% | -2.8 (-4.3 to -1.2) | -1.7 (-2.7 to -0.2) |
+
+## One game dropped at a time
+
+| Result | Games | Full sample | Lowest with one game dropped | Highest with one game dropped |
+|---|---|---|---|---|
+| Return from buying YES, all prices, both leagues | 88 | -9.9% | -11.0% | -9.2% |
+| Return from buying YES under 5c, both leagues | 86 | -39.2% | -43.3% | -37.9% |
+| Midpoint error as a share of money spent, both leagues | 88 | +2.5% | +1.7% | +3.5% |
+| NBA under 5c: actual minus expected (points) | 38 | -1.8 | -2.2 | -1.7 |
+| NFL contracts the book curve gave under 5%: actual minus expected (points) | 48 | +3.2 | +2.8 | +3.4 |
+| Brier score, Kalshi minus book curve, both leagues (Brier) | 88 | 0.0000 | -0.0002 | +0.0001 |
+
+## Return from buying YES by order size
+
+| Price band | No fee | 100 contracts | 10 contracts | 1 contract |
+|---|---|---|---|---|
+| under 5c | -34.5% | -38.7% | -39.2% | -45.7% |
+| 5-10c | -21.7% | -26.4% | -26.7% | -29.8% |
+| 10-20c | -14.2% | -18.9% | -19.1% | -20.8% |
+| 20-50c | -9.8% | -13.6% | -13.7% | -14.7% |
+| 50-80c | -4.8% | -6.9% | -6.9% | -7.5% |
+| 80c and up | -1.6% | -2.4% | -2.5% | -2.8% |
+| all prices | -7.1% | -9.8% | -9.9% | -10.9% |

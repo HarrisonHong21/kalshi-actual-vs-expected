@@ -247,3 +247,39 @@ def test_distance_table_compares_both_sources_on_the_same_contracts():
     assert row["actual"] == pytest.approx(0.10)
     assert row["kalshi_gap"] == pytest.approx(0.10 - 0.05)   # midpoint 5c
     assert row["book_gap"] == pytest.approx(0.10 - 0.01)
+
+
+def test_dropping_one_game_at_a_time():
+    # Game A's two 30c contracts both pay out; game B's two do not. Actual minus expected is
+    # +20 points overall, +70 with only A left and -30 with only B left.
+    low = dict(books_over=0.02, league="NBA")
+    rows = [contract("A", 0.05, 0.97, "yes", **low), contract("A", 0.05, 0.97, "yes", **low),
+            contract("B", 0.05, 0.97, "no", **low), contract("B", 0.05, 0.97, "no", **low)]
+    table = study.sensitivity_table(prepared(rows)).set_index("key")
+    gap = table.loc["nba_under5_gap"]
+    assert gap["games"] == 2
+    assert gap["full_sample"] == pytest.approx(0.5 - 0.04)
+    assert gap["lowest_without_one_game"] == pytest.approx(0.0 - 0.04)    # A dropped
+    assert gap["highest_without_one_game"] == pytest.approx(1.0 - 0.04)   # B dropped
+    # the full-sample return matches buying every contract
+    assert table.loc["return_all", "full_sample"] == pytest.approx(study.yes_buy_return(prepared(rows)))
+
+
+def test_smaller_orders_pay_more_fee_per_contract():
+    table = study.order_size_table(prepared(four_contracts_at_30c())).set_index("band")
+    row = table.loc["20-50c"]
+    assert row["no_fee"] == pytest.approx((0.25 - 0.32) / 0.32)
+    assert row["contracts_10"] == pytest.approx((0.25 - 0.336) / 0.336)   # 1.6c fee a contract
+    assert row["contracts_1"] == pytest.approx((0.25 - 0.34) / 0.34)      # 1.52c rounded up to 2c
+    assert row["no_fee"] > row["contracts_100"] > row["contracts_10"] > row["contracts_1"]
+
+
+def test_whole_study_runs_on_the_made_up_sample_data(tmp_path):
+    sample = Path(__file__).parent.parent / "sample_data"
+    study.main([str(sample / "nfl_sample.csv"), str(sample / "nba_sample.csv"), "--out", str(tmp_path)])
+    for name in ["output/band_table.csv", "output/cost_table.csv", "output/accuracy_table.csv",
+                 "output/rare_table.csv", "output/distance_table.csv", "output/sensitivity_table.csv",
+                 "output/order_size_table.csv", "output/key_numbers.json", "output/tables.md",
+                 "charts/actual_vs_expected.png", "charts/cost_split.png", "charts/kalshi_vs_book_curve.png",
+                 "one_page_summary.pdf"]:
+        assert (tmp_path / name).stat().st_size > 0, name

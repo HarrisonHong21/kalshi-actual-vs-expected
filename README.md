@@ -9,12 +9,13 @@ A one-page version is in [one_page_summary.pdf](one_page_summary.pdf).
 A Kalshi contract priced at 10 cents implies about a 10% chance. This study checks that against
 17,653 settled NFL and NBA player-prop contracts from 88 games, 5 October to 9 November 2026.
 
-1. **Prices were close to outcomes.** Measured at the midpoint between the buy and sell price,
-   contracts in every price band paid out within -2.0 to +0.9 percentage points of what the price
-   implied, and no band's 95% range excludes zero.
+1. **No measurable gap between prices and outcomes.** Measured at the midpoint between the buy
+   and sell price, contracts in every price band paid out within -2.0 to +0.9 percentage points of
+   what the price implied, and no band's 95% range excludes zero. That is not proof the prices
+   were right: the data cannot rule out a gap of up to 4.5 points in a band.
 2. **What buyers lost was mostly the cost of trading.** Buying YES on every contract returned
    -9.9% (95% range -14.2% to -5.9%). The spread and the fee, both known before buying, were 75%
-   of that loss.
+   of that loss. Dropping any one game leaves the return in the range -11.0% to -9.2%.
 3. **Kalshi was as accurate as a curve fitted to sportsbook lines,** except on rare outcomes,
    where the curve was wrong in opposite directions in the two leagues.
 
@@ -40,8 +41,18 @@ paying to trade?
 - **Size.** 17,990 rows were read. 105 were settled part-way (for example, the player left the
   game) and are left out. Of the rest, 17,653 have both a buy and a sell price, so they have a
   midpoint. They cover 88 games (49 NFL, 39 NBA) and 1,119 player-games.
+- **Collection.** Each scan of a game saves one row per contract with the time of the scan. At
+  least three hours after the start, the app fills in Kalshi's settlement for the same contract
+  ticker. No ticker appears twice.
+- **Timing.** Prices were logged a median of 1.5 hours before the start for NFL games and 3.2
+  hours for NBA games. 78% of contracts were logged within 6 hours of the start, and the longest
+  gap was 117 hours. The data records when the app read each price, not when the quote was last
+  updated, so the age of the quotes is unknown.
+- **Which games.** The games are the ones my app scanned, some automatically shortly before the
+  start and some by hand, and only while the app was running. They are not every game played in
+  the period and not a random sample.
 - **Not in this repository.** The raw price data is not included. The tables of results in
-  [output/](output/) are.
+  [output/](output/) are, and [sample_data/](sample_data/) has made-up data in the same layout.
 
 ## Method
 
@@ -58,12 +69,12 @@ paying to trade?
 - **Fixed in advance.** The bands, the return formula and the 6-hour cutoff for a "fresh" scan are
   constants at the top of the script. They were set at the start and not tuned to the results.
 - **Fee.** Kalshi charges 0.07 x price x (1 - price) per contract, rounded up to the next cent on
-  the whole order. The study uses a 10-contract order. On a single contract the rounding makes
-  longshots look worse than shown here.
+  the whole order. The study uses a 10-contract order, chosen after seeing how much the rounding
+  matters on a single contract. The robustness section shows other order sizes.
 
 ## Findings
 
-### 1. Prices were close to outcomes
+### 1. No measurable gap between prices and outcomes
 
 ![Actual minus expected by price band](charts/actual_vs_expected.png)
 
@@ -77,6 +88,9 @@ paying to trade?
 | 80c and up | 1,472 | 86.5% | 85.6% | +0.9 (-2.0 to +3.3) | 1.00 | 1.00 |
 
 - **Both leagues together:** no band's range excludes zero.
+- **What that does and doesn't show.** A range that includes zero means the data found no gap,
+  not that there is none. The ranges allow a gap of up to 4.5 points in a band. Contracts under
+  5c were priced at 3.6% on average, and their true payout rate could be anywhere from 2.1% to 4.3%.
 - **Credibility is low for longshots.** The under-5c band has 0.23 of full credibility if
   contracts were independent and 0.18 by game. The 5-10c band has 0.43 and 0.29.
 
@@ -144,6 +158,10 @@ points, a count curve for receptions, touchdowns, rebounds, assists and threes).
 chance of going over any line, including lines the sportsbooks don't quote. It is my
 extrapolation from sportsbook lines, not a sportsbook's own price.
 
+The curve's widths were set from earlier seasons: the NFL ones before the first NFL game here and
+the NBA ones two weeks before the first NBA game. They were not changed during the sample, so
+every game here is one the curve had not seen.
+
 **Overall accuracy is a tie.** The Brier score is the average squared miss between the chance
 given and what happened, so lower is better.
 
@@ -201,6 +219,43 @@ The same contracts, grouped by how far the line is from the middle of the sports
 - **NBA, 1+ swings below the middle:** Kalshi's midpoint was too low. Wide NBA spreads may pull
   the midpoint down there, but this study does not test that.
 
+## Robustness checks
+
+**Does one game drive a result?** Each headline result was worked out again with every game
+dropped in turn. The table shows the lowest and highest value that gives.
+
+| Result | Games | Full sample | Lowest with one game dropped | Highest with one game dropped |
+|---|---|---|---|---|
+| Return from buying YES, all prices, both leagues | 88 | -9.9% | -11.0% | -9.2% |
+| Return from buying YES under 5c, both leagues | 86 | -39.2% | -43.3% | -37.9% |
+| Midpoint error as a share of money spent, both leagues | 88 | +2.5% | +1.7% | +3.5% |
+| NBA under 5c: actual minus expected (points) | 38 | -1.8 | -2.2 | -1.7 |
+| NFL contracts the book curve gave under 5%: actual minus expected (points) | 48 | +3.2 | +2.8 | +3.4 |
+| Brier score, Kalshi minus book curve, both leagues (Brier) | 88 | 0.0000 | -0.0002 | +0.0001 |
+
+- **No single game drives any of them.** The overall return stays in the range -11.0% to -9.2%,
+  and the return under 5c in -43.3% to -37.9%.
+- **The two league results keep their sign.** The NBA under-5c gap stays in -2.2 to -1.7 points
+  and the NFL book-curve gap in +2.8 to +3.4 points. This does not make them proven: the 95%
+  ranges in the findings above are the measure of that.
+
+**Does the order size change the return?** Kalshi rounds the fee up to the next cent on the whole
+order, so small orders pay more fee per contract.
+
+| Price band | No fee | 100 contracts | 10 contracts | 1 contract |
+|---|---|---|---|---|
+| under 5c | -34.5% | -38.7% | -39.2% | -45.7% |
+| 5-10c | -21.7% | -26.4% | -26.7% | -29.8% |
+| 10-20c | -14.2% | -18.9% | -19.1% | -20.8% |
+| 20-50c | -9.8% | -13.6% | -13.7% | -14.7% |
+| 50-80c | -4.8% | -6.9% | -6.9% | -7.5% |
+| 80c and up | -1.6% | -2.4% | -2.5% | -2.8% |
+| all prices | -7.1% | -9.8% | -9.9% | -10.9% |
+
+- **Under 5c:** -34.5% with no fee, -38.7% on a 100-contract order and -45.7% on a single contract.
+- **These are prices on screen, not fills.** The data has no order sizes, so the study cannot say
+  how many contracts could have been bought at the ask.
+
 ## Limits
 
 - **Small sample.** Five weeks of one season and 88 games. Only the bands from 50c up reach full credibility.
@@ -221,6 +276,11 @@ The same contracts, grouped by how far the line is from the middle of the sports
     .venv/bin/python -m pytest
     .venv/bin/python study.py PATH/kalshi_record.csv PATH/nba_kalshi_record.csv
 
+To try it without real data, run it on the made-up sample files. The numbers that come out
+mean nothing; they only show the script works end to end.
+
+    .venv/bin/python study.py sample_data/nfl_sample.csv sample_data/nba_sample.csv --out demo_output
+
 The tests run on made-up data and need no price data. The study itself needs two CSV files, one
 per league, with these columns: `event_id`, `player`, `game_time`, `logged_at`, `yes_ask`,
 `no_ask`, `result` (`yes`, `no` or `scalar`), `books_over`, `line`, `middle` and `distance`.
@@ -233,4 +293,5 @@ per league, with these columns: `event_id`, `player`, `game_time`, `logged_at`, 
 - `output/`: the tables of results as CSV, plus `key_numbers.json` and `tables.md`, which this
   README and the PDF are filled from.
 - `charts/`: the three charts.
+- `sample_data/`: made-up data in the same layout as the real data, and the script that makes it.
 - `one_page_summary.pdf`: the one-page version, written by the script.

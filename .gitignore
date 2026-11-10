@@ -2,7 +2,10 @@
 __pycache__/
 .pytest_cache/
 .DS_Store
-# raw Kalshi data never goes in this repo
+# raw Kalshi data never goes in this repo; only result tables and made-up sample data do
 data/
 *.csv
 !output/*.csv
+!sample_data/*.csv
+# output from running the study on the sample data
+demo_output/

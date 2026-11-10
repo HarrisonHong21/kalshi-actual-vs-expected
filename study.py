@@ -7,7 +7,9 @@ price to buy YES and the price to buy NO just before the game, and how it settle
 
 1. compares how often contracts paid out (actual) with the chance their price implied (expected);
 2. splits what a buyer lost into the spread, the fee and the midpoint being wrong;
-3. compares Kalshi's midpoint with a second opinion: a curve fitted to sportsbook lines.
+3. compares Kalshi's midpoint with a second opinion: a curve fitted to sportsbook lines;
+4. checks how much the headline results move when any one game is dropped, and how the
+   return changes with the size of the order.
 
 Every definition below was fixed before looking at the results, so the study can't go hunting
 for a flattering cut of the data.
@@ -334,6 +336,66 @@ def distance_table(df, resamples=RESAMPLES, seed=SEED):
     return table
 
 
+def sensitivity_table(df, contracts=ORDER_SIZE):
+    """Leave-one-game-out check: each headline result worked out again with every game dropped
+    in turn, to see whether one game drives it. Shows the lowest and highest value that gives.
+
+    Every result here is a total divided by a total (profit / money spent, or summed gaps /
+    contracts), so dropping a game just takes its part out of both.
+    """
+    df = df[df["midpoint"].notna()].assign(one=1.0)
+    df["spent"] = df["yes_ask"] + df["yes_ask"].map(lambda p: fee_per_contract(p, contracts))
+    df["profit"] = df["happened"] - df["spent"]
+    df["miss"] = df["midpoint"] - df["happened"]
+    df["kalshi_gap"] = df["happened"] - df["midpoint"]
+    df["book_gap"] = df["happened"] - df["books_over"]
+    df["brier_gap"] = (df["midpoint"] - df["happened"]) ** 2 - (df["books_over"] - df["happened"]) ** 2
+    under5 = df["band"] == "under 5c"
+
+    results = [
+        ("return_all", "Return from buying YES, all prices, both leagues", "%", df, "profit", "spent"),
+        ("return_under5", "Return from buying YES under 5c, both leagues", "%", df[under5], "profit", "spent"),
+        ("midpoint_all", "Midpoint error as a share of money spent, both leagues", "%", df, "miss", "spent"),
+        ("nba_under5_gap", "NBA under 5c: actual minus expected", "points",
+         df[under5 & (df["league"] == "NBA")], "kalshi_gap", "one"),
+        ("nfl_book_rare_gap", "NFL contracts the book curve gave under 5%: actual minus expected", "points",
+         df[(df["books_over"] < RARE_BELOW) & (df["league"] == "NFL")], "book_gap", "one"),
+        ("brier_gap", "Brier score, Kalshi minus book curve, both leagues", "Brier", df, "brier_gap", "one"),
+    ]
+    rows = []
+    for key, name, unit, part, top, bottom in results:
+        if part.empty:
+            continue
+        per_game = part.groupby("game_id")[[top, bottom]].sum()
+        without_one = (per_game[top].sum() - per_game[top]) / (per_game[bottom].sum() - per_game[bottom])
+        rows.append({
+            "key": key,
+            "result": name,
+            "unit": unit,
+            "games": len(per_game),
+            "full_sample": per_game[top].sum() / per_game[bottom].sum(),
+            "lowest_without_one_game": without_one.min(),
+            "highest_without_one_game": without_one.max(),
+        })
+    return pd.DataFrame(rows)
+
+
+def order_size_table(df, sizes=(100, 10, 1)):
+    """The return from buying YES at different order sizes. Kalshi rounds the fee up to the next
+    cent on the whole order, so the fee per contract is higher on small orders."""
+    df = df[df["midpoint"].notna()]
+    rows = []
+    for label in BAND_LABELS + [ALL_PRICES]:
+        part = df if label == ALL_PRICES else df[df["band"] == label]
+        if part.empty:
+            continue
+        row = {"band": label, "no_fee": (part["happened"].sum() - part["yes_ask"].sum()) / part["yes_ask"].sum()}
+        for size in sizes:
+            row[f"contracts_{size}"] = yes_buy_return(part, size)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def all_tables(df, make_table=band_table, early=False):
     """One table for each league and for both together, on all scans and on fresh scans only
     (and, if `early`, on scans made more than FRESH_HOURS before the start)."""
@@ -461,7 +523,7 @@ def _span(low, high, unit=""):
     return f"{low * 100:+.1f}{unit} to {high * 100:+.1f}{unit}"
 
 
-def key_numbers(raw, df, bands, costs, accuracy, rare, distance):
+def key_numbers(raw, df, bands, costs, accuracy, rare, distance, sensitivity, order_sizes):
     """The headline figures as text, on all scans. The one-page PDF is filled from these and a
     test checks that the README quotes every one, so no number in either is typed by hand."""
     kickoff = pd.to_datetime(df["game_time"], utc=True).dt.tz_convert("America/New_York")
@@ -479,6 +541,13 @@ def key_numbers(raw, df, bands, costs, accuracy, rare, distance):
     nfl_book, nfl_kalshi = _row(rare, "NFL", source=BOOK), _row(rare, "NFL", source=KALSHI)
     nba_book = _row(rare, "NBA", source=BOOK)
     nfl_far = _row(distance, "NFL", distance_band="2+ above")
+    with_midpoint = df[df["midpoint"].notna()]
+    median_hours = with_midpoint.groupby("league")["hours_before"].median()
+    dropped = sensitivity.set_index("key")
+    sizes_under5 = order_sizes.set_index("band").loc["under 5c"]
+
+    def without_one_game(key, unit=""):
+        return _span(dropped.loc[key, "lowest_without_one_game"], dropped.loc[key, "highest_without_one_game"], unit)
 
     return {
         "rows_read": f"{len(raw):,}",
@@ -489,10 +558,19 @@ def key_numbers(raw, df, bands, costs, accuracy, rare, distance):
         "nba_games": str(df[df["league"] == "NBA"]["game_id"].nunique()),
         "player_games": f"{df.groupby(['game_id', 'player']).ngroups:,}",
         "period": f"{first.day} {first:%B} to {last.day} {last:%B %Y}",
+        "nfl_median_hours_before": f"{median_hours['NFL']:.1f}",
+        "nba_median_hours_before": f"{median_hours['NBA']:.1f}",
+        "fresh_share": f"{with_midpoint['fresh'].mean() * 100:.0f}%",
+        "longest_hours_before": f"{with_midpoint['hours_before'].max():.0f}",
 
         "all_pooled_ranges_include_zero": bool(((pooled["gap_low"] <= 0) & (pooled["gap_high"] >= 0)).all()),
         "pooled_gap_lowest": f"{pooled['gap'].min() * 100:+.1f}",
         "pooled_gap_highest": f"{pooled['gap'].max() * 100:+.1f}",
+        # the largest gap, in either direction, that any band's range still allows
+        "pooled_widest_bound": f"{max(pooled['gap_low'].abs().max(), pooled['gap_high'].abs().max()) * 100:.1f}",
+        "under5_expected": _pct(under5["expected"]),
+        "under5_plausible_low": _pct(under5["expected"] + under5["gap_low"]),
+        "under5_plausible_high": _pct(under5["expected"] + under5["gap_high"]),
         "nfl_longshot_largest_gap": f"{nfl_longshots['gap'].abs().max() * 100:.1f}",
         "nba_under5_actual": _pct(nba_under5["actual"]),
         "nba_under5_expected": _pct(nba_under5["expected"]),
@@ -521,6 +599,14 @@ def key_numbers(raw, df, bands, costs, accuracy, rare, distance):
         "nfl_spread_cents": f"{_row(costs, 'NFL', band=ALL_PRICES)['spread_cents']:.1f}",
         "nba_spread_cents": f"{_row(costs, 'NBA', band=ALL_PRICES)['spread_cents']:.1f}",
 
+        "return_all_without_one_game": without_one_game("return_all", "%"),
+        "return_under5_without_one_game": without_one_game("return_under5", "%"),
+        "nba_under5_gap_without_one_game": without_one_game("nba_under5_gap"),
+        "nfl_book_rare_gap_without_one_game": without_one_game("nfl_book_rare_gap"),
+        "return_under5_no_fee": _pct(sizes_under5["no_fee"], signed=True),
+        "return_under5_100_contracts": _pct(sizes_under5["contracts_100"], signed=True),
+        "return_under5_1_contract": _pct(sizes_under5["contracts_1"], signed=True),
+
         "brier_kalshi": f"{brier['brier_kalshi']:.4f}",
         "brier_book": f"{brier['brier_book']:.4f}",
         "brier_base_rate": f"{brier['brier_base_rate']:.4f}",
@@ -543,7 +629,7 @@ def _md(headers, rows):
     return "\n".join(lines)
 
 
-def markdown_tables(bands, costs, accuracy, rare, distance):
+def markdown_tables(bands, costs, accuracy, rare, distance, sensitivity, order_sizes):
     """The tables shown in the README, as Markdown, so they are copied and never retyped."""
     def gap(row, name="gap"):
         return f"{_signed(row[name] * 100)} ({_span(row[name + '_low'], row[name + '_high'])})"
@@ -593,6 +679,18 @@ def markdown_tables(bands, costs, accuracy, rare, distance):
              for league in ["NFL", "NBA"]
              for _, r in distance[(distance["sample"] == league) & (distance["scans"] == "all")].iterrows()]),
     }
+    def in_unit(x, unit):
+        return {"%": _pct(x, signed=True), "points": _signed(x * 100), "Brier": _signed(x, 4)}[unit]
+
+    tables["One game dropped at a time"] = _md(
+        ["Result", "Games", "Full sample", "Lowest with one game dropped", "Highest with one game dropped"],
+        [[r["result"] + (f" ({r['unit']})" if r["unit"] != "%" else ""), r["games"], in_unit(r["full_sample"], r["unit"]),
+          in_unit(r["lowest_without_one_game"], r["unit"]), in_unit(r["highest_without_one_game"], r["unit"])]
+         for _, r in sensitivity.iterrows()])
+    tables["Return from buying YES by order size"] = _md(
+        ["Price band", "No fee", "100 contracts", "10 contracts", "1 contract"],
+        [[r["band"], _pct(r["no_fee"], signed=True), _pct(r["contracts_100"], signed=True),
+          _pct(r["contracts_10"], signed=True), _pct(r["contracts_1"], signed=True)] for _, r in order_sizes.iterrows()])
     return "\n\n".join(f"## {title}\n\n{table}" for title, table in tables.items()) + "\n"
 
 
@@ -609,13 +707,16 @@ def write_summary_pdf(n, charts, path):
         return [words, Image(str(Path(charts) / chart), width=width, height=width / aspect)]
 
     findings = Table([
-        finding("1. Prices were close to outcomes.",
+        finding("1. No measurable gap between prices and outcomes.",
                 f"With both leagues together, contracts in every price band paid out within "
                 f"{n['pooled_gap_lowest']} to {n['pooled_gap_highest']} points of the midpoint price, and no "
                 f"band's 95% range excludes zero. By league, the exception is NBA contracts under 5 cents: {n['nba_under5_actual']} paid out against "
                 f"{n['nba_under5_expected']} expected, on only {n['nba_under5_payouts']} payouts. Longshot "
                 f"bands are thin: the under-5-cent band has {n['credibility_under5']} of full credibility, or "
-                f"{n['credibility_under5_by_game']} once contracts in the same game are allowed to move together.",
+                f"{n['credibility_under5_by_game']} once contracts in the same game are allowed to move together. "
+                f"So this is not proof the prices were right: for contracts under 5 cents, priced at "
+                f"{n['under5_expected']} on average, the true rate could be {n['under5_plausible_low']} to "
+                f"{n['under5_plausible_high']}.",
                 "actual_vs_expected.png", 9 / 5),
         finding("2. What buyers lost was mostly the cost of trading.",
                 f"Buying YES on every contract returned {n['return_all']} ({n['return_all_range']}). Of each "
@@ -623,7 +724,8 @@ def write_summary_pdf(n, charts, path):
                 f"{ORDER_SIZE}-contract order, and {n['midpoint_all']} ({n['midpoint_all_range']}) to the midpoint "
                 f"being too high. The spread and fee, both known before buying, were {n['known_share_of_loss']} "
                 f"of the loss. Longshots cost the most: under 5 cents the spread alone took {n['spread_under5']} "
-                f"and buyers returned {n['return_under5']}, against {n['return_80_up']} at 80 cents and up.",
+                f"and buyers returned {n['return_under5']}, against {n['return_80_up']} at 80 cents and up. "
+                f"Dropping any one game leaves the overall return in the range {n['return_all_without_one_game']}.",
                 "cost_split.png", 11 / 5),
         finding("3. Kalshi matched a sportsbook-based curve, except on rare outcomes.",
                 f"Overall accuracy was a tie: a Brier score of {n['brier_kalshi']} for Kalshi's midpoint and "
@@ -644,23 +746,25 @@ def write_summary_pdf(n, charts, path):
         Paragraph(f"An actual-versus-expected study of {n['contracts']} settled player-prop contracts from "
                   f"{n['games']} NFL and NBA games, {n['period']}. {AUTHOR}.", byline),
         Spacer(1, 9),
-        Paragraph(f"<b>Bottom line.</b> Kalshi's prices were about right. Measured at the midpoint between the "
-                  f"buy and sell price, contracts paid out about as often as priced, and what buyers lost was "
-                  f"mostly the spread and the fee. With only {n['games']} games, most gaps cannot be told apart "
-                  f"from zero, so every result is reported with a range.", body),
+        Paragraph(f"<b>Bottom line.</b> The data shows no measurable gap between Kalshi's prices and outcomes. "
+                  f"Measured at the midpoint between the buy and sell price, contracts paid out within a few "
+                  f"points of what the price implied, and what buyers lost was mostly the spread and the fee. "
+                  f"With only {n['games']} games, a gap of up to {n['pooled_widest_bound']} points in a price band "
+                  f"cannot be ruled out, so every result is reported with a range.", body),
         Spacer(1, 10),
         findings,
         Paragraph("<b>Method.</b> Prices were logged before each game by my own app from Kalshi's public API; "
                   "results are Kalshi's settlements. The price bands and return formula were set at the start "
                   "and not tuned to the results. Every 95% range comes from resampling whole games, because one "
-                  "player's contracts in a game win or lose together. "
+                  "player's contracts in a game win or lose together. The sportsbook curve was set from earlier "
+                  "seasons and not changed during the sample. "
                   "<b>Limits.</b> Five weeks of one season; games I chose to scan; the YES side only; contracts "
                   "settled part-way are left out. This is a study of prices, not betting advice. "
                   "The analysis code is covered by tests.", small),
     ]
     doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.55 * inch, rightMargin=0.55 * inch,
                             topMargin=0.5 * inch, bottomMargin=0.45 * inch,
-                            title="Do Kalshi prices match what happened?", author=AUTHOR)
+                            title="Do Kalshi prices match what happened?", author=AUTHOR, invariant=1)
     doc.build(story)
     if doc.page != 1:
         raise RuntimeError(f"The summary ran to {doc.page} pages; it must fit on one.")
@@ -778,12 +882,12 @@ def chart_kalshi_vs_book(tables, path):
     plt.close(fig)
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("nfl_csv")
     parser.add_argument("nba_csv")
     parser.add_argument("--out", default=str(Path(__file__).parent), help="folder for output/ and charts/")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     raw = load({"NFL": args.nfl_csv, "NBA": args.nba_csv})
     df = prepare(raw)
@@ -798,6 +902,8 @@ def main():
     accuracy = all_tables(df, accuracy_table, early=True)
     rare = all_tables(df, rare_table)
     distance = all_tables(df, distance_table)
+    sensitivity = sensitivity_table(df)
+    order_sizes = order_size_table(df)
 
     print("\n\nOVERALL ACCURACY (Brier score, lower is better)\n")
     print(show_accuracy(accuracy))
@@ -810,20 +916,26 @@ def main():
         for (scans, sample), table in tables.groupby(["scans", "sample"], sort=False):
             print(f"\n{sample}, {scans} scans")
             print(render(table))
+    print("\n\nONE GAME DROPPED AT A TIME (% and points are shown as fractions)\n")
+    print(sensitivity.drop(columns="key").round(4).to_string(index=False))
+    print("\n\nRETURN FROM BUYING YES, BY ORDER SIZE (both leagues, as fractions)\n")
+    print(order_sizes.round(3).to_string(index=False))
 
     out = Path(args.out)
     (out / "output").mkdir(parents=True, exist_ok=True)
     (out / "charts").mkdir(parents=True, exist_ok=True)
     for name, table in [("band_table", bands), ("cost_table", costs), ("accuracy_table", accuracy),
-                        ("rare_table", rare), ("distance_table", distance)]:
+                        ("rare_table", rare), ("distance_table", distance),
+                        ("sensitivity_table", sensitivity), ("order_size_table", order_sizes)]:
         table.to_csv(out / "output" / f"{name}.csv", index=False)
     chart_actual_vs_expected(bands, out / "charts" / "actual_vs_expected.png")
     chart_cost_split(costs, out / "charts" / "cost_split.png")
     chart_kalshi_vs_book(distance, out / "charts" / "kalshi_vs_book_curve.png")
 
-    numbers = key_numbers(raw, df, bands, costs, accuracy, rare, distance)
+    numbers = key_numbers(raw, df, bands, costs, accuracy, rare, distance, sensitivity, order_sizes)
     (out / "output" / "key_numbers.json").write_text(json.dumps(numbers, indent=2) + "\n")
-    (out / "output" / "tables.md").write_text(markdown_tables(bands, costs, accuracy, rare, distance))
+    (out / "output" / "tables.md").write_text(
+        markdown_tables(bands, costs, accuracy, rare, distance, sensitivity, order_sizes))
     write_summary_pdf(numbers, out / "charts", out / "one_page_summary.pdf")
     print(f"\nSaved tables to {out / 'output'}, charts to {out / 'charts'} and {out / 'one_page_summary.pdf'}")
 
