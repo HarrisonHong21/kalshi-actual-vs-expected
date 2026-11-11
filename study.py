@@ -377,10 +377,11 @@ def cost_table(df, contracts=ORDER_SIZE, resamples=RESAMPLES, seed=SEED):
 
 
 def tolerance_table(bands, costs):
-    """Can the data rule out a gap big enough to matter? The yardstick is the cost of trading
-    one contract (half-spread plus fee): a gap smaller than that could not be traded on at a
-    profit. A band passes when its whole 95% range lies inside plus or minus that cost.
-    Uses both leagues together, on all scans."""
+    """Can the data rule out a gap big enough to matter? The rough yardstick is the average cost
+    of trading in each band: the half-spread plus the fee per contract on an ORDER_SIZE-contract
+    order. A band passes when its whole 95% range lies inside plus or minus that cost. This
+    compares band averages; it says nothing about whether a single contract could be traded at
+    a profit. Uses both leagues together, on all scans."""
     rows = []
     for label in BAND_LABELS:
         band = bands[(bands["sample"] == BOTH) & (bands["scans"] == "all") & (bands["band"] == label)]
@@ -896,7 +897,7 @@ def markdown_tables(quality, bands, costs, accuracy, rare, distance, sensitivity
           _pct(r["share_asking_under_10c"]), _pct(r["paid_out"]), _pct(r["book_curve_said"])]
          for _, r in exclusions.iterrows()])
     tables["Gap range against the cost of trading"] = _md(
-        ["Price band", "Gap in points (95% range)", "Cost of trading one contract, points", "Range inside the cost?"],
+        ["Price band", "Gap in points (95% range)", f"Trading cost per contract on a {ORDER_SIZE}-contract order, points", "Range inside the cost?"],
         [[r["band"], gap(r), f"{r['trading_cost'] * 100:.1f}", "yes" if r["range_inside_cost"] else "no"]
          for _, r in tolerance.iterrows()])
     tables["Rare outcomes on the same contracts"] = _md(
@@ -927,11 +928,11 @@ def write_summary_pdf(n, charts, path):
     """The one-page summary. `n` is the dict from key_numbers; `charts` is the charts folder."""
     title = ParagraphStyle("title", fontName="Helvetica-Bold", fontSize=17, leading=21, textColor=INK)
     byline = ParagraphStyle("byline", fontName="Helvetica", fontSize=9, leading=12, textColor=MUTED)
-    body = ParagraphStyle("body", fontName="Helvetica", fontSize=9, leading=12.5, textColor=INK)
+    body = ParagraphStyle("body", fontName="Helvetica", fontSize=9, leading=12, textColor=INK)
     small = ParagraphStyle("small", parent=body, fontSize=8, leading=10.5, textColor=MUTED)
 
     def finding(heading, text, chart, aspect):
-        width = 4.4 * inch
+        width = 4.2 * inch
         words = Paragraph(f"<b>{heading}</b><br/>{text}", body)
         return [words, Image(str(Path(charts) / chart), width=width, height=width / aspect)]
 
@@ -943,14 +944,14 @@ def write_summary_pdf(n, charts, path):
                 f"{n['nba_under5_expected']} expected, on only {n['nba_under5_payouts']} payouts. Longshot "
                 f"bands are thin: the under-5-cent band has {n['credibility_under5']} of full credibility, or "
                 f"{n['credibility_under5_by_game']} once contracts in the same game are allowed to move together. "
-                f"So this is not proof the prices were right: for contracts under 5 cents, priced at "
-                f"{n['under5_expected']} on average, the true rate could be {n['under5_plausible_low']} to "
-                f"{n['under5_plausible_high']}.",
+                f"So this is not proof the prices were right: contracts under 5 cents were priced at "
+                f"{n['under5_expected']} on average, and for the games sampled the 95% range puts their payout "
+                f"rate at {n['under5_plausible_low']} to {n['under5_plausible_high']}.",
                 "actual_vs_expected.png", 9 / 5),
         finding("2. What a buyer would have lost was mostly the cost of trading.",
                 f"Buying YES on every contract at the quoted ask and holding to settlement would have returned "
                 f"{n['return_all']} ({n['return_all_range']}). Of each dollar spent, {n['half_spread_all']} went "
-                f"to the half-spread (the ask minus the midpoint), {n['fee_all']} to the fee on a "
+                f"to the half-spread, {n['fee_all']} to the fee on a "
                 f"{ORDER_SIZE}-contract order, and {n['midpoint_all']} ({n['midpoint_all_range']}) to the midpoint "
                 f"being too high. The half-spread and fee, both known before buying, were "
                 f"{n['known_share_of_loss']} of the loss. Longshots cost the most: under 5 cents the half-spread "
@@ -958,15 +959,15 @@ def write_summary_pdf(n, charts, path):
                 f"{n['return_80_up']} at 80 cents and up. Dropping any one game leaves the overall return in the "
                 f"range {n['return_all_without_one_game']}.",
                 "cost_split.png", 11 / 5),
-        finding("3. Kalshi matched a sportsbook-based curve, except on rare outcomes.",
-                f"Overall accuracy was a tie: a Brier score of {n['brier_kalshi']} for Kalshi's midpoint and "
+        finding("3. Kalshi and a sportsbook-based curve scored alike, except on rare outcomes.",
+                f"The two had nearly identical Brier scores: {n['brier_kalshi']} for Kalshi's midpoint and "
                 f"{n['brier_book']} for a curve fitted to sportsbook lines (giving every contract the same chance "
-                f"scores {n['brier_base_rate']}). On NFL lines far above the sportsbooks' middle, "
-                f"{n['nfl_far_actual']} paid out; Kalshi said {n['nfl_far_kalshi']} and the curve "
-                f"{n['nfl_far_book']}. The curve is this study's own extrapolation, so this is a finding about "
-                f"the curve, not about sportsbooks.",
+                f"scores {n['brier_base_rate']}), and the range on the difference includes zero. In this sample, "
+                f"on NFL lines far above the sportsbooks' middle, {n['nfl_far_actual']} paid out; Kalshi said "
+                f"{n['nfl_far_kalshi']} and the curve {n['nfl_far_book']}. This is exploratory, and it is a "
+                f"finding about this study's own curve, not about sportsbooks.",
                 "kalshi_vs_book_curve.png", 11 / 5),
-    ], colWidths=[3.0 * inch, 4.4 * inch])
+    ], colWidths=[3.2 * inch, 4.2 * inch])
     findings.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (0, -1), 6), ("LEFTPADDING", (1, 0), (1, -1), 0),
                                   ("RIGHTPADDING", (0, 0), (0, -1), 10), ("RIGHTPADDING", (1, 0), (1, -1), 0),
                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
@@ -985,8 +986,8 @@ def write_summary_pdf(n, charts, path):
         Spacer(1, 10),
         findings,
         Paragraph("<b>Method.</b> Prices were logged before each game by my own app from Kalshi's public API; "
-                  "results are Kalshi's settlements. The price bands and return formula were set at the start "
-                  "and not tuned to the results. Every 95% range comes from resampling whole games, because one "
+                  "results are Kalshi's settlements. The price bands and return formula were chosen at the first "
+                  "look at the data and other checks came later; nothing was registered in advance. Every 95% range comes from resampling whole games, because one "
                   "player's contracts in a game win or lose together. The sportsbook curve was set from earlier "
                   "seasons and not changed during the sample. "
                   "<b>Limits.</b> Five weeks of one season; games I chose to scan; the YES side only; contracts "

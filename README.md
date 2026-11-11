@@ -20,8 +20,9 @@ A Kalshi contract priced at 10 cents implies about a 10% chance. This study chec
    -5.9%). The half-spread and the fee, both known before buying, were 75% of that loss. Dropping
    any one game leaves the return in the range -11.0% to -9.2%. This is a hypothetical return at
    quoted prices, not a trading record.
-3. **Kalshi was as accurate as a curve fitted to sportsbook lines,** except on rare outcomes,
-   where the curve was wrong in opposite directions in the two leagues.
+3. **Kalshi and a curve fitted to sportsbook lines scored almost the same overall.** They
+   differed on rare outcomes, where in this sample the curve missed in opposite directions in
+   the two leagues.
 
 The sample is small. Only the price bands from 50 cents up reach full credibility, so every
 result below comes with a range, and several things that look like findings are not established.
@@ -168,13 +169,16 @@ Chosen later, after seeing results:
 - **Both leagues together:** no band's range excludes zero.
 - **What that does and doesn't show.** A range that includes zero means the data found no gap,
   not that there is none. The ranges allow a gap of up to 4.5 points in a band. Contracts under
-  5c were priced at 3.6% on average, and their true payout rate could be anywhere from 2.1% to 4.3%.
-- **Is any gap big enough to matter?** One yardstick is the cost of trading one contract, the
-  half-spread plus the fee: a gap smaller than that could not be traded on at a profit. In 2 of
-  6 bands the whole range sits inside that cost. In the other four the range is too wide to rule
-  out a gap larger than the cost of trading.
+  5c were priced at 3.6% on average. For the games sampled here, the 95% range puts their payout
+  rate anywhere from 2.1% to 4.3%. The games were not chosen at random, so that range does not
+  carry over to Kalshi as a whole.
+- **Is any gap big enough to matter?** One rough yardstick is the average cost of trading in
+  each band: the half-spread plus the fee per contract on a 10-contract order. In 2 of 6 bands
+  the whole range sits inside that cost. In the other four the range is too wide to rule out a
+  gap larger than it. This compares averages across a band. It says nothing about whether any
+  single contract could be traded at a profit.
 
-| Price band | Gap in points (95% range) | Cost of trading one contract, points | Range inside the cost? |
+| Price band | Gap in points (95% range) | Trading cost per contract on a 10-contract order, points | Range inside the cost? |
 |---|---|---|---|
 | under 5c | -0.4 (-1.5 to +0.7) | 1.6 | yes |
 | 5-10c | -0.3 (-1.7 to +1.3) | 2.2 | yes |
@@ -271,8 +275,9 @@ The curve, for the record:
 These settings and dates come from my private app's code and history. They cannot be checked
 from this repository.
 
-**Overall accuracy is a tie.** The Brier score is the average squared miss between the chance
-given and what happened, so lower is better.
+**Overall, the two scored almost the same.** The Brier score is the average squared miss between
+the chance given and what happened, so lower is better. The range on the difference includes
+zero, which means the data cannot separate them. It does not show they are equally accurate.
 
 | Sample | Scans | Contracts | Games | Kalshi midpoint | Book curve | Same chance for all | Kalshi minus book (95% range) |
 |---|---|---|---|---|---|---|---|
@@ -288,10 +293,11 @@ given and what happened, so lower is better.
 
 - **Both leagues, all scans:** 0.1527 for each, against 0.2251 for giving every contract the same
   chance. The range on the difference is -0.0006 to +0.0007.
-- **Timing:** the tie holds for scans within 6 hours of the start and for earlier ones. NBA
+- **Timing:** the same holds for scans within 6 hours of the start and for earlier ones. NBA
   scores look worse on early scans, but that is 8 games and there is no range on that comparison.
 
-**Rare outcomes are where the two differ.** These are the contracts each source gave under a 5% chance.
+**Rare outcomes are where the two differ in this sample.** These are the contracts each source
+gave under a 5% chance. The 5% line was chosen after seeing results, so treat this as exploratory.
 
 | League | Source | Contracts | Payouts | Paid out | Expected | Gap in points (95% range) |
 |---|---|---|---|---|---|---|
@@ -334,8 +340,9 @@ The same contracts, grouped by how far the line is from the middle of the sports
 | NBA | 2+ above | 210 | 1.0% | 3.8% | 2.7% | -2.8 (-4.3 to -1.2) | -1.7 (-2.7 to -0.2) |
 
 - **NFL, 2+ swings above the middle:** 5.2% paid out. Kalshi said 4.6% and the curve said 1.5%.
-  The curve's tails are too thin; Kalshi's are not.
-- **NBA, above the middle:** both sources rated these too high.
+  In this sample the curve gave these outcomes too low a chance, and Kalshi's midpoint was
+  closer to what happened.
+- **NBA, above the middle:** in this sample both sources gave these too high a chance.
 - **NBA, 1+ swings below the middle:** Kalshi's midpoint was too low. Wide NBA spreads may pull
   the midpoint down there, but this study does not test that.
 

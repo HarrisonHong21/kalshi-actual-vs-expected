@@ -108,7 +108,7 @@
 
 ## Gap range against the cost of trading
 
-| Price band | Gap in points (95% range) | Cost of trading one contract, points | Range inside the cost? |
+| Price band | Gap in points (95% range) | Trading cost per contract on a 10-contract order, points | Range inside the cost? |
 |---|---|---|---|
 | under 5c | -0.4 (-1.5 to +0.7) | 1.6 | yes |
 | 5-10c | -0.3 (-1.7 to +1.3) | 2.2 | yes |
