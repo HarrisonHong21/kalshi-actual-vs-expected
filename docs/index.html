@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Do Kalshi prices match what happened?</title>
+<meta name="description" content="Actual versus expected for 17,653 settled Kalshi player-prop contracts from 88 games.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --paper: #f0f3ea; --ink: #13251f; --muted: #55645d; --field: #12382f; --chalk: #f3f6ea;
+  --stripe: rgba(19, 37, 31, 0.055); --rule: rgba(19, 37, 31, 0.22);
+  --spread: #1c5d4e; --fee: #9bc4ae; --mid: #e3a417;
+  --sans: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.55 var(--sans); }
+.wrap { max-width: 900px; margin: 0 auto; padding-inline: 20px; }
+a { color: inherit; text-decoration-thickness: 2px; text-underline-offset: 3px; text-decoration-color: var(--mid); }
+p { margin: 0; max-width: 66ch; }
+
+header { background: var(--field); color: var(--chalk); padding-block: 56px 44px; }
+h1 {
+  margin: 0 0 18px; font-weight: 800; font-stretch: 68%; letter-spacing: -0.01em;
+  font-size: clamp(2.6rem, 8.5vw, 5.2rem); line-height: 0.94; text-wrap: balance;
+}
+header p { font-size: 1.1rem; max-width: 56ch; color: rgba(243, 246, 234, 0.82); }
+header p strong { color: var(--chalk); font-weight: 600; }
+
+main { display: flex; flex-direction: column; gap: 56px; padding-block: 44px 72px; }
+h2 { margin: 0 0 8px; font-weight: 800; font-stretch: 72%; font-size: 1.9rem; line-height: 1.05; text-wrap: balance; }
+.lede { color: var(--muted); font-size: 0.95rem; }
+section { display: flex; flex-direction: column; gap: 18px; }
+
+.findings { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; counter-reset: finding; }
+.findings li { counter-increment: finding; font-size: 0.95rem; }
+.findings li::before {
+  content: counter(finding); display: block; font-weight: 800; font-stretch: 62%;
+  font-size: 3rem; line-height: 1; color: var(--spread); margin-bottom: 6px;
+}
+.findings strong { display: block; font-size: 1.05rem; line-height: 1.3; margin-bottom: 4px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 14px 36px; align-items: end; position: sticky; top: 0; z-index: 2; background: var(--paper); padding-block: 12px; border-bottom: 2px solid var(--ink); }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.group > span { font-size: 0.85rem; color: var(--muted); }
+.group > div { display: flex; flex-wrap: wrap; }
+button.pick {
+  font: 600 0.95rem/1 var(--sans); padding: 10px 14px; cursor: pointer; border-radius: 0;
+  background: transparent; color: var(--ink); border: 2px solid var(--ink); margin-right: -2px;
+}
+button.pick:hover { background: var(--stripe); }
+button.pick[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+button.pick:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--mid); outline-offset: 2px; }
+.note { font-size: 0.95rem; font-weight: 600; background: var(--mid); color: var(--ink); padding: 10px 14px; max-width: none; }
+
+.chart { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.row { display: grid; grid-template-columns: 104px minmax(0, 1fr) 176px; gap: 14px; align-items: center; padding-block: 5px; }
+.row:nth-child(odd):not(.axis-row) .track { background: var(--stripe); }
+.row .label { font-weight: 700; font-stretch: 80%; font-size: 1.05rem; }
+.row .value { font-size: 0.9rem; color: var(--muted); }
+.row.total { border-top: 2px solid var(--ink); margin-top: 6px; padding-top: 10px; }
+.row.total .value { color: var(--ink); font-weight: 700; }
+.track { position: relative; height: 30px; }
+.track .zero { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--ink); }
+.track .range { position: absolute; top: 10px; height: 10px; background: var(--spread); opacity: 0.38; }
+.track .dot { position: absolute; top: 7px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--ink); border: 3px solid var(--paper); }
+.track .seg { position: absolute; top: 4px; height: 22px; }
+.seg.spread { background: var(--spread); }
+.seg.fee { background: var(--fee); }
+.seg.mid { background: var(--mid); }
+.seg.mid.helped { background: repeating-linear-gradient(135deg, var(--mid) 0 3px, var(--paper) 3px 6px); }
+.axis { position: relative; height: 22px; font-size: 0.8rem; color: var(--muted); }
+.axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.9rem; }
+.legend i { display: inline-block; width: 14px; height: 14px; margin-right: 7px; vertical-align: -2px; }
+
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; width: 100%; margin-top: 10px; }
+th, td { text-align: left; padding: 7px 16px 7px 0; white-space: nowrap; }
+th { font-weight: 700; border-bottom: 2px solid var(--ink); }
+td { border-bottom: 1px solid var(--rule); }
+summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; width: fit-content; }
+
+.limits { background: var(--field); color: var(--chalk); padding-block: 44px 52px; }
+.limits ul { margin: 14px 0 22px; padding-left: 1.1em; columns: 2; column-gap: 40px; }
+.limits li { break-inside: avoid; margin-bottom: 10px; }
+.limits p { font-size: 0.95rem; color: rgba(243, 246, 234, 0.82); max-width: none; }
+
+@media (max-width: 680px) {
+  .findings { grid-template-columns: 1fr; gap: 20px; }
+  .row { grid-template-columns: 78px minmax(0, 1fr); }
+  .row .value { grid-column: 2; }
+  .axis-row .value { display: none; }
+  .limits ul { columns: 1; }
+  .controls { position: static; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Do Kalshi prices match what happened?</h1>
+    <p>An actual-versus-expected study of <strong>17,653</strong> settled NFL and NBA player-prop
+      contracts from <strong>88</strong> games, 5 October to 9 November 2026. By Harrison Hong.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <ol class="findings">
+    <li><strong>No measurable gap between prices and outcomes.</strong> Every price band paid out within
+      -2.0 to +0.9 points of what its price implied, and no band's 95% range
+      excludes zero. The data cannot rule out a gap of up to 4.5 points in a band.</li>
+    <li><strong>The loss was mostly the cost of trading.</strong> Buying YES on every contract at the quoted ask
+      would have returned -9.9% (95% range -14.2% to -5.9%). The half-spread and the fee, both known
+      before buying, were 75% of that loss. This is a hypothetical return, not a trading record.</li>
+    <li><strong>It held when any one game was dropped.</strong> Leaving out each game in turn keeps the return
+      between -11.0% to -9.2%.</li>
+  </ol>
+
+  <div>
+    <div class="controls" role="group" aria-label="Choose what the charts show">
+      <div class="group"><span>League</span><div id="league"></div></div>
+      <div class="group"><span>Prices logged</span><div id="scans"></div></div>
+    </div>
+    <p class="note" id="caveat" hidden></p>
+  </div>
+
+  <section>
+    <div>
+      <h2>Actual minus expected, by price band</h2>
+      <p class="lede">Each dot is how much more or less often contracts paid out than their midpoint price
+        implied, in percentage points. The bar is the 95% range from resampling whole games 2,000 times.
+        A bar that crosses zero means no gap was found.</p>
+    </div>
+    <div class="chart" id="gap-chart"></div>
+    <details>
+      <summary>Exact numbers</summary>
+      <div class="scroll"><table id="gap-table"></table></div>
+    </details>
+  </section>
+
+  <section>
+    <div>
+      <h2>Where a YES buyer's money would have gone</h2>
+      <p class="lede">Share of the money spent that would have been lost to each part, buying at the quoted
+        ask and holding to settlement. The half-spread and fee are known before buying. The midpoint error is the
+        only part that depends on the price being wrong.</p>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--spread)"></i>Half-spread</span>
+      <span><i style="background:var(--fee)"></i>Fee</span>
+      <span><i style="background:var(--mid)"></i>Midpoint error</span>
+      <span><i class="seg mid helped" style="position:static"></i>Midpoint error in the buyer's favour</span>
+    </div>
+    <div class="chart" id="cost-chart"></div>
+    <details>
+      <summary>Exact numbers</summary>
+      <div class="scroll"><table id="cost-table"></table></div>
+    </details>
+  </section>
+</main>
+
+<div class="limits">
+  <div class="wrap">
+    <h2>What this does not show</h2>
+    <ul>
+      <li>The sample is five weeks of one season. Only the bands from 50c up reach full credibility.</li>
+      <li>The games are the ones my app scanned. They are not a random sample of Kalshi.</li>
+      <li>Returns are at prices on screen with an assumed order size. They are not trades, and real fills could be worse.</li>
+      <li>Single-league results are exploratory. With two leagues and six bands, some ranges exclude zero by chance.</li>
+      <li>This is a study of prices. It contains no picks and is not betting advice.</li>
+    </ul>
+    <p>Method, robustness checks, code and tests are on
+      <a href="https://github.com/HarrisonHong21/kalshi-actual-vs-expected">GitHub</a>.
+      There is also a
+      <a href="https://github.com/HarrisonHong21/kalshi-actual-vs-expected/blob/main/one_page_summary.pdf">one-page summary (PDF)</a>.</p>
+  </div>
+</div>
+
+<script>
+const DATA = {"bands":["under 5c","5-10c","10-20c","20-50c","50-80c","80c and up"],"all_prices":"all prices","band_rows":[{"sample":"NFL + NBA","scans":"all","band":"under 5c","gap":-0.4022457067371204,"low":-1.5105477970878503,"high":0.6982938419803965,"contracts":"1,514","games":"86","actual":"3.2%","expected":"3.6%","gap_text":"-0.4 (-1.5 to +0.7)","cred_independent":"0.23","cred_by_game":"0.18"},{"sample":"NFL + NBA","scans":"all","band":"5-10c","gap":-0.27813811522319803,"low":-1.6515659240831844,"high":1.2635775238393914,"contracts":"2,621","games":"88","actual":"6.8%","expected":"7.1%","gap_text":"-0.3 (-1.7 to +1.3)","cred_independent":"0.43","cred_by_game":"0.29"},{"sample":"NFL + NBA","scans":"all","band":"10-20c","gap":-0.7078114700065927,"low":-2.5790563058569056,"high":1.3165303070244594,"contracts":"3,034","games":"88","actual":"13.7%","expected":"14.5%","gap_text":"-0.7 (-2.6 to +1.3)","cred_independent":"0.69","cred_by_game":"0.43"},{"sample":"NFL + NBA","scans":"all","band":"20-50c","gap":-2.034962933279905,"low":-4.479933930842255,"high":0.300675763183436,"contracts":"4,991","games":"88","actual":"31.7%","expected":"33.7%","gap_text":"-2.0 (-4.5 to +0.3)","cred_independent":"1.00","cred_by_game":"0.83"},{"sample":"NFL + NBA","scans":"all","band":"50-80c","gap":-1.137030589405627,"low":-3.898788932342913,"high":1.3634067489528099,"contracts":"4,021","games":"88","actual":"63.3%","expected":"64.5%","gap_text":"-1.1 (-3.9 to +1.4)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NFL + NBA","scans":"all","band":"80c and up","gap":0.8824728260869571,"low":-2.012462971312389,"high":3.2965488638938787,"contracts":"1,472","games":"87","actual":"86.5%","expected":"85.6%","gap_text":"+0.9 (-2.0 to +3.3)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NFL","scans":"all","band":"under 5c","gap":0.1275045537340618,"low":-1.1597047594728862,"high":1.6061497569255327,"contracts":"1,098","games":"48","actual":"3.7%","expected":"3.6%","gap_text":"+0.1 (-1.2 to +1.6)","cred_independent":"0.19","cred_by_game":"0.16"},{"sample":"NFL","scans":"all","band":"5-10c","gap":0.3014894709809966,"low":-1.3877140109092416,"high":2.276259194825007,"contracts":"1,947","games":"49","actual":"7.3%","expected":"7.0%","gap_text":"+0.3 (-1.4 to +2.3)","cred_independent":"0.37","cred_by_game":"0.24"},{"sample":"NFL","scans":"all","band":"10-20c","gap":0.07358111501757784,"low":-2.3297988415132536,"high":2.8453482252780957,"contracts":"1,991","games":"49","actual":"14.5%","expected":"14.4%","gap_text":"+0.1 (-2.3 to +2.8)","cred_independent":"0.56","cred_by_game":"0.32"},{"sample":"NFL","scans":"all","band":"20-50c","gap":-2.34993924665857,"low":-5.538189965560432,"high":1.0123620274769736,"contracts":"3,292","games":"49","actual":"31.2%","expected":"33.5%","gap_text":"-2.3 (-5.5 to +1.0)","cred_independent":"1.00","cred_by_game":"0.62"},{"sample":"NFL","scans":"all","band":"50-80c","gap":-2.425284930350356,"low":-6.380592967073562,"high":1.3402073706641813,"contracts":"2,369","games":"49","actual":"61.8%","expected":"64.2%","gap_text":"-2.4 (-6.4 to +1.3)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NFL","scans":"all","band":"80c and up","gap":0.03399433427763779,"low":-4.733922102487649,"high":4.16902326987755,"contracts":"706","games":"49","actual":"85.0%","expected":"85.0%","gap_text":"0.0 (-4.7 to +4.2)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NBA","scans":"all","band":"under 5c","gap":-1.8004807692307692,"low":-3.010139182522903,"high":-0.2531840824182055,"contracts":"416","games":"38","actual":"1.7%","expected":"3.5%","gap_text":"-1.8 (-3.0 to -0.3)","cred_independent":"0.12","cred_by_game":"0.11"},{"sample":"NBA","scans":"all","band":"5-10c","gap":-1.95252225519288,"low":-3.8142344372856227,"high":-0.012483456769903388,"contracts":"674","games":"39","actual":"5.2%","expected":"7.1%","gap_text":"-2.0 (-3.8 to -0.0)","cred_independent":"0.22","cred_by_game":"0.19"},{"sample":"NBA","scans":"all","band":"10-20c","gap":-2.1994247363374875,"low":-4.649928453543085,"high":0.3290666617109104,"contracts":"1,043","games":"39","actual":"12.4%","expected":"14.6%","gap_text":"-2.2 (-4.6 to +0.3)","cred_independent":"0.41","cred_by_game":"0.32"},{"sample":"NBA","scans":"all","band":"20-50c","gap":-1.424661565626835,"low":-4.861485492133267,"high":1.9718791434632652,"contracts":"1,699","games":"39","actual":"32.5%","expected":"34.0%","gap_text":"-1.4 (-4.9 to +2.0)","cred_independent":"0.90","cred_by_game":"0.58"},{"sample":"NBA","scans":"all","band":"50-80c","gap":0.7103510895883854,"low":-2.1682176917888945,"high":3.4542060917760082,"contracts":"1,652","games":"39","actual":"65.6%","expected":"64.8%","gap_text":"+0.7 (-2.2 to +3.5)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NBA","scans":"all","band":"80c and up","gap":1.6644908616188139,"low":-1.2096898404428438,"high":4.155157184148066,"contracts":"766","games":"38","actual":"87.9%","expected":"86.2%","gap_text":"+1.7 (-1.2 to +4.2)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NFL + NBA","scans":"fresh","band":"under 5c","gap":-0.5649509803921574,"low":-1.721410070239978,"high":0.7090438835501367,"contracts":"1,224","games":"62","actual":"2.9%","expected":"3.5%","gap_text":"-0.6 (-1.7 to +0.7)","cred_independent":"0.20","cred_by_game":"0.16"},{"sample":"NFL + NBA","scans":"fresh","band":"5-10c","gap":-0.6389175257731964,"low":-2.1827154479633295,"high":1.2188768094216682,"contracts":"1,940","games":"62","actual":"6.5%","expected":"7.1%","gap_text":"-0.6 (-2.2 to +1.2)","cred_independent":"0.37","cred_by_game":"0.24"},{"sample":"NFL + NBA","scans":"fresh","band":"10-20c","gap":-1.3343096234309642,"low":-3.428883007311164,"high":0.9387727153387537,"contracts":"2,390","games":"62","actual":"13.1%","expected":"14.5%","gap_text":"-1.3 (-3.4 to +0.9)","cred_independent":"0.61","cred_by_game":"0.38"},{"sample":"NFL + NBA","scans":"fresh","band":"20-50c","gap":-1.9799540347293179,"low":-4.651056484748616,"high":0.8217993467855136,"contracts":"3,916","games":"62","actual":"31.7%","expected":"33.7%","gap_text":"-2.0 (-4.7 to +0.8)","cred_independent":"1.00","cred_by_game":"0.72"},{"sample":"NFL + NBA","scans":"fresh","band":"50-80c","gap":-1.004749841671945,"low":-4.290131454523096,"high":1.974252252096947,"contracts":"3,158","games":"62","actual":"63.5%","expected":"64.5%","gap_text":"-1.0 (-4.3 to +2.0)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NFL + NBA","scans":"fresh","band":"80c and up","gap":0.7359597652975763,"low":-2.6165594612451293,"high":3.5658595680547878,"contracts":"1,193","games":"62","actual":"86.5%","expected":"85.8%","gap_text":"+0.7 (-2.6 to +3.6)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NFL","scans":"fresh","band":"under 5c","gap":0.13711583924349927,"low":-1.406065596080566,"high":1.7140028332101482,"contracts":"846","games":"31","actual":"3.7%","expected":"3.5%","gap_text":"+0.1 (-1.4 to +1.7)","cred_independent":"0.17","cred_by_game":"0.13"},{"sample":"NFL","scans":"fresh","band":"5-10c","gap":-0.19145802650957247,"low":-2.4096083498180376,"high":2.2729332711480534,"contracts":"1,358","games":"31","actual":"6.9%","expected":"7.1%","gap_text":"-0.2 (-2.4 to +2.3)","cred_independent":"0.31","cred_by_game":"0.18"},{"sample":"NFL","scans":"fresh","band":"10-20c","gap":0.009054325955733796,"low":-3.019012954226881,"high":3.36896957340025,"contracts":"1,491","games":"31","actual":"14.4%","expected":"14.4%","gap_text":"0.0 (-3.0 to +3.4)","cred_independent":"0.48","cred_by_game":"0.27"},{"sample":"NFL","scans":"fresh","band":"20-50c","gap":-1.7466063348416303,"low":-5.55099997647703,"high":2.0547486680896854,"contracts":"2,431","games":"31","actual":"31.8%","expected":"33.5%","gap_text":"-1.7 (-5.6 to +2.1)","cred_independent":"1.00","cred_by_game":"0.51"},{"sample":"NFL","scans":"fresh","band":"50-80c","gap":-2.222541690626789,"low":-7.702044890873011,"high":2.608867933479393,"contracts":"1,739","games":"31","actual":"61.9%","expected":"64.2%","gap_text":"-2.2 (-7.7 to +2.6)","cred_independent":"1.00","cred_by_game":"0.74"},{"sample":"NFL","scans":"fresh","band":"80c and up","gap":-0.8509803921568801,"low":-7.428193785687975,"high":4.666731141199229,"contracts":"510","games":"31","actual":"84.3%","expected":"85.2%","gap_text":"-0.9 (-7.4 to +4.7)","cred_independent":"1.00","cred_by_game":"0.85"},{"sample":"NBA","scans":"fresh","band":"under 5c","gap":-2.1362433862433865,"low":-3.218233445186055,"high":-0.6824524716699022,"contracts":"378","games":"31","actual":"1.3%","expected":"3.5%","gap_text":"-2.1 (-3.2 to -0.7)","cred_independent":"0.11","cred_by_game":"0.10"},{"sample":"NBA","scans":"fresh","band":"5-10c","gap":-1.6829896907216522,"low":-3.7485281259108145,"high":0.5914146243701306,"contracts":"582","games":"31","actual":"5.5%","expected":"7.2%","gap_text":"-1.7 (-3.7 to +0.6)","cred_independent":"0.20","cred_by_game":"0.18"},{"sample":"NBA","scans":"fresh","band":"10-20c","gap":-3.562291434927698,"low":-5.8726850513162105,"high":-1.1582531687118132,"contracts":"899","games":"31","actual":"11.0%","expected":"14.6%","gap_text":"-3.6 (-5.9 to -1.2)","cred_independent":"0.38","cred_by_game":"0.33"},{"sample":"NBA","scans":"fresh","band":"20-50c","gap":-2.3619528619528576,"low":-5.929448307525793,"high":1.475825413021058,"contracts":"1,485","games":"31","actual":"31.6%","expected":"34.0%","gap_text":"-2.4 (-5.9 to +1.5)","cred_independent":"0.84","cred_by_game":"0.54"},{"sample":"NBA","scans":"fresh","band":"50-80c","gap":0.4876673713883068,"low":-2.7681620934469837,"high":3.591761858745902,"contracts":"1,419","games":"31","actual":"65.5%","expected":"65.0%","gap_text":"+0.5 (-2.8 to +3.6)","cred_independent":"1.00","cred_by_game":"1.00"},{"sample":"NBA","scans":"fresh","band":"80c and up","gap":1.9209370424597538,"low":-1.1803686836328098,"high":4.773059132690198,"contracts":"683","games":"31","actual":"88.1%","expected":"86.2%","gap_text":"+1.9 (-1.2 to +4.8)","cred_independent":"1.00","cred_by_game":"1.00"}],"cost_rows":[{"sample":"NFL + NBA","scans":"all","band":"under 5c","spread":24.356553585685138,"fee":7.097869751999086,"mid":7.71755522043822,"ask":"4.8c","spread_text":"24.4%","fee_text":"7.1%","mid_text":"+7.7% (-13.4% to +28.6%)","return_short":"-39.2%","return_text":"-39.2% (-60.4% to -17.9%)"},{"sample":"NFL + NBA","scans":"all","band":"5-10c","spread":17.29232339360818,"fee":6.456020214158141,"mid":3.00002469156125,"ask":"8.7c","spread_text":"17.3%","fee_text":"6.5%","mid_text":"+3.0% (-13.7% to +17.9%)","return_short":"-26.7%","return_text":"-26.7% (-41.2% to -10.5%)"},{"sample":"NFL + NBA","scans":"all","band":"10-20c","spread":9.191019521092873,"fee":5.724376140024061,"mid":4.167151783288705,"ask":"16.0c","spread_text":"9.2%","fee_text":"5.7%","mid_text":"+4.2% (-7.8% to +15.2%)","return_short":"-19.1%","return_text":"-19.1% (-29.8% to -7.3%)"},{"sample":"NFL + NBA","scans":"all","band":"20-50c","spread":3.8235178439936983,"fee":4.320009788904888,"mid":5.548047572329737,"ask":"35.1c","spread_text":"3.8%","fee_text":"4.3%","mid_text":"+5.5% (-0.8% to +12.2%)","return_short":"-13.7%","return_text":"-13.7% (-20.1% to -7.5%)"},{"sample":"NFL + NBA","scans":"all","band":"50-80c","spread":2.990171547384532,"fee":2.27037365081303,"mid":1.6712792560687144,"ask":"66.5c","spread_text":"3.0%","fee_text":"2.3%","mid_text":"+1.7% (-2.0% to +5.7%)","return_short":"-6.9%","return_text":"-6.9% (-10.8% to -3.3%)"},{"sample":"NFL + NBA","scans":"all","band":"80c and up","spread":2.5972274788199545,"fee":0.8678876955773583,"mid":-0.9952207949814526,"ask":"87.9c","spread_text":"2.6%","fee_text":"0.9%","mid_text":"-1.0% (-3.7% to +2.3%)","return_short":"-2.5%","return_text":"-2.5% (-5.7% to +0.2%)"},{"sample":"NFL + NBA","scans":"all","band":"all prices","spread":4.386801733852455,"fee":3.0305153262301823,"mid":2.521330320357265,"ask":"36.9c","spread_text":"4.4%","fee_text":"3.0%","mid_text":"+2.5% (-1.7% to +6.9%)","return_short":"-9.9%","return_text":"-9.9% (-14.2% to -5.9%)"},{"sample":"NFL","scans":"all","band":"under 5c","spread":21.862232098057483,"fee":7.1751128951329655,"mid":-2.508780732563973,"ask":"4.7c","spread_text":"21.9%","fee_text":"7.2%","mid_text":"-2.5% (-31.4% to +23.0%)","return_short":"-26.5%","return_text":"-26.5% (-51.8% to +2.7%)"},{"sample":"NFL","scans":"all","band":"5-10c","spread":15.254585506717039,"fee":6.486480316847956,"mid":-3.349959480898951,"ask":"8.4c","spread_text":"15.3%","fee_text":"6.5%","mid_text":"-3.3% (-25.4% to +15.5%)","return_short":"-18.4%","return_text":"-18.4% (-36.8% to +3.1%)"},{"sample":"NFL","scans":"all","band":"10-20c","spread":7.203389830508475,"fee":5.762104367899884,"mid":-0.4449911913006474,"ask":"15.6c","spread_text":"7.2%","fee_text":"5.8%","mid_text":"-0.4% (-17.4% to +14.1%)","return_short":"-12.5%","return_text":"-12.5% (-27.1% to +4.5%)"},{"sample":"NFL","scans":"all","band":"20-50c","spread":2.8341370250215743,"fee":4.372872611716507,"mid":6.5001138528214915,"ask":"34.6c","spread_text":"2.8%","fee_text":"4.4%","mid_text":"+6.5% (-2.8% to +15.4%)","return_short":"-13.7%","return_text":"-13.7% (-22.5% to -4.4%)"},{"sample":"NFL","scans":"all","band":"50-80c","spread":1.643027691250949,"fee":2.3665912020838835,"mid":3.6272874544024316,"ask":"65.3c","spread_text":"1.6%","fee_text":"2.4%","mid_text":"+3.6% (-2.0% to +9.6%)","return_short":"-7.6%","return_text":"-7.6% (-13.4% to -2.1%)"},{"sample":"NFL","scans":"all","band":"80c and up","spread":1.365920050534158,"fee":0.9911467541897441,"mid":-0.03907280239907075,"ask":"86.1c","spread_text":"1.4%","fee_text":"1.0%","mid_text":"-0.0% (-4.8% to +5.4%)","return_short":"-2.3%","return_text":"-2.3% (-7.8% to +2.5%)"},{"sample":"NFL","scans":"all","band":"all prices","spread":3.3123241301255373,"fee":3.291227975982294,"mid":3.1869628299946293,"ask":"33.5c","spread_text":"3.3%","fee_text":"3.3%","mid_text":"+3.2% (-3.3% to +9.4%)","return_short":"-9.8%","return_text":"-9.8% (-15.8% to -3.2%)"},{"sample":"NBA","scans":"all","band":"under 5c","spread":30.380404206517504,"fee":6.911325572337386,"mid":32.41441987276583,"ask":"5.2c","spread_text":"30.4%","fee_text":"6.9%","mid_text":"+32.4% (+4.4% to +53.9%)","return_short":"-69.7%","return_text":"-69.7% (-91.5% to -42.1%)"},{"sample":"NBA","scans":"all","band":"5-10c","spread":22.560939621082447,"fee":6.377264947175826,"mid":19.418048751696862,"ask":"9.4c","spread_text":"22.6%","fee_text":"6.4%","mid_text":"+19.4% (+0.1% to +38.4%)","return_short":"-48.4%","return_text":"-48.4% (-66.4% to -29.8%)"},{"sample":"NBA","scans":"all","band":"10-20c","spread":12.706855791962173,"fee":5.657640232108316,"mid":12.325381474317645,"ask":"16.8c","spread_text":"12.7%","fee_text":"5.7%","mid_text":"+12.3% (-1.8% to +26.7%)","return_short":"-30.7%","return_text":"-30.7% (-43.6% to -17.8%)"},{"sample":"NBA","scans":"all","band":"20-50c","spread":5.66188558822565,"fee":4.221785418205152,"mid":3.7790139435544434,"ask":"36.1c","spread_text":"5.7%","fee_text":"4.2%","mid_text":"+3.8% (-5.2% to +12.9%)","return_short":"-13.7%","return_text":"-13.7% (-22.6% to -4.5%)"},{"sample":"NBA","scans":"all","band":"50-80c","spread":4.842996605777906,"fee":2.138038644985556,"mid":-1.0189612759982731,"ask":"68.2c","spread_text":"4.8%","fee_text":"2.1%","mid_text":"-1.0% (-5.0% to +3.1%)","return_short":"-6.0%","return_text":"-6.0% (-10.1% to -1.9%)"},{"sample":"NBA","scans":"all","band":"80c and up","spread":3.691751085383501,"fee":0.7583212735166426,"mid":-1.8451519536903038,"ask":"89.5c","spread_text":"3.7%","fee_text":"0.8%","mid_text":"-1.8% (-4.6% to +1.3%)","return_short":"-2.6%","return_text":"-2.6% (-5.8% to +0.1%)"},{"sample":"NBA","scans":"all","band":"all prices","spread":5.923904045144993,"fee":2.657550812938174,"mid":1.5691045452585757,"ask":"43.0c","spread_text":"5.9%","fee_text":"2.7%","mid_text":"+1.6% (-3.1% to +6.2%)","return_short":"-10.2%","return_text":"-10.2% (-14.7% to -5.7%)"},{"sample":"NFL + NBA","scans":"fresh","band":"under 5c","spread":22.715020828228376,"fee":7.179612839990197,"mid":11.296250918892431,"ask":"4.6c","spread_text":"22.7%","fee_text":"7.2%","mid_text":"+11.3% (-14.2% to +34.4%)","return_short":"-41.2%","return_text":"-41.2% (-64.4% to -15.5%)"},{"sample":"NFL + NBA","scans":"fresh","band":"5-10c","spread":14.251924310455417,"fee":6.487675249702191,"mid":7.0987583615870955,"ask":"8.4c","spread_text":"14.3%","fee_text":"6.5%","mid_text":"+7.1% (-13.5% to +24.5%)","return_short":"-27.8%","return_text":"-27.8% (-45.0% to -6.8%)"},{"sample":"NFL + NBA","scans":"fresh","band":"10-20c","spread":7.1345285494468405,"fee":5.757738306600886,"mid":8.031066552836563,"ask":"15.7c","spread_text":"7.1%","fee_text":"5.8%","mid_text":"+8.0% (-5.6% to +20.7%)","return_short":"-20.9%","return_text":"-20.9% (-33.6% to -7.2%)"},{"sample":"NFL + NBA","scans":"fresh","band":"20-50c","spread":3.04287680472318,"fee":4.345372658535952,"mid":5.4418049372439565,"ask":"34.8c","spread_text":"3.0%","fee_text":"4.3%","mid_text":"+5.4% (-2.3% to +12.8%)","return_short":"-12.8%","return_text":"-12.8% (-20.2% to -5.1%)"},{"sample":"NFL + NBA","scans":"fresh","band":"50-80c","spread":2.468656890810306,"fee":2.2936262195478183,"mid":1.482970146637846,"ask":"66.2c","spread_text":"2.5%","fee_text":"2.3%","mid_text":"+1.5% (-2.9% to +6.3%)","return_short":"-6.2%","return_text":"-6.2% (-11.0% to -1.8%)"},{"sample":"NFL + NBA","scans":"fresh","band":"80c and up","spread":2.4658326294845554,"fee":0.8640806601251246,"mid":-0.8295023175047668,"ask":"88.0c","spread_text":"2.5%","fee_text":"0.9%","mid_text":"-0.8% (-4.0% to +3.0%)","return_short":"-2.5%","return_text":"-2.5% (-6.2% to +0.8%)"},{"sample":"NFL + NBA","scans":"fresh","band":"all prices","spread":3.603542752768371,"fee":3.0199018227482015,"mid":2.8860496974770737,"ask":"36.9c","spread_text":"3.6%","fee_text":"3.0%","mid_text":"+2.9% (-2.2% to +7.8%)","return_short":"-9.5%","return_text":"-9.5% (-14.3% to -4.5%)"},{"sample":"NFL","scans":"fresh","band":"under 5c","spread":19.090370955011842,"fee":7.310576164167324,"mid":-2.8610891870560358,"ask":"4.4c","spread_text":"19.1%","fee_text":"7.3%","mid_text":"-2.9% (-35.9% to +29.6%)","return_short":"-23.5%","return_text":"-23.5% (-55.7% to +9.5%)"},{"sample":"NFL","scans":"fresh","band":"5-10c","spread":10.648148148148145,"fee":6.532921810699587,"mid":2.2290809327846386,"ask":"8.0c","spread_text":"10.6%","fee_text":"6.5%","mid_text":"+2.2% (-26.5% to +28.1%)","return_short":"-19.4%","return_text":"-19.4% (-45.0% to +9.1%)"},{"sample":"NFL","scans":"fresh","band":"10-20c","spread":4.882601393484877,"fee":5.794269750735822,"mid":-0.056121855097524466,"ask":"15.2c","spread_text":"4.9%","fee_text":"5.8%","mid_text":"-0.1% (-20.9% to +18.7%)","return_short":"-10.6%","return_text":"-10.6% (-29.4% to +10.2%)"},{"sample":"NFL","scans":"fresh","band":"20-50c","spread":1.883592380023105,"fee":4.401645870824915,"mid":4.885603693083753,"ask":"34.2c","spread_text":"1.9%","fee_text":"4.4%","mid_text":"+4.9% (-5.8% to +15.5%)","return_short":"-11.2%","return_text":"-11.2% (-21.7% to -0.6%)"},{"sample":"NFL","scans":"fresh","band":"50-80c","spread":0.9202517781136057,"fee":2.405652529565905,"mid":3.3491272339068603,"ask":"64.8c","spread_text":"0.9%","fee_text":"2.4%","mid_text":"+3.3% (-3.9% to +11.6%)","return_short":"-6.7%","return_text":"-6.7% (-14.9% to +0.6%)"},{"sample":"NFL","scans":"fresh","band":"80c and up","spread":0.7890518490717903,"fee":1.0112976850710937,"mid":0.9812278008514517,"ask":"85.8c","spread_text":"0.8%","fee_text":"1.0%","mid_text":"+1.0% (-5.4% to +8.5%)","return_short":"-2.8%","return_text":"-2.8% (-10.4% to +3.6%)"},{"sample":"NFL","scans":"fresh","band":"all prices","spread":2.1788931146139348,"fee":3.318406888075412,"mid":3.0300532525179436,"ask":"33.1c","spread_text":"2.2%","fee_text":"3.3%","mid_text":"+3.0% (-5.0% to +11.3%)","return_short":"-8.5%","return_text":"-8.5% (-16.7% to -0.5%)"},{"sample":"NBA","scans":"fresh","band":"under 5c","spread":29.82439165981326,"fee":6.922742005708479,"mid":39.064389724735136,"ask":"5.1c","spread_text":"29.8%","fee_text":"6.9%","mid_text":"+39.1% (+12.2% to +59.4%)","return_short":"-75.8%","return_text":"-75.8% (-95.5% to -48.7%)"},{"sample":"NBA","scans":"fresh","band":"5-10c","spread":21.503243168644765,"fee":6.396632624896494,"mid":16.89725365719017,"ask":"9.3c","spread_text":"21.5%","fee_text":"6.4%","mid_text":"+16.9% (-5.8% to +38.4%)","return_short":"-44.8%","return_text":"-44.8% (-64.5% to -23.5%)"},{"sample":"NBA","scans":"fresh","band":"10-20c","spread":10.595074583958858,"fee":5.7016002810872966,"mid":20.45868336154854,"ask":"16.4c","spread_text":"10.6%","fee_text":"5.7%","mid_text":"+20.5% (+6.6% to +34.2%)","return_short":"-36.8%","return_text":"-36.8% (-50.2% to -23.4%)"},{"sample":"NBA","scans":"fresh","band":"20-50c","spread":4.855871402633347,"fee":4.257367482486653,"mid":6.311643114595686,"ask":"35.8c","spread_text":"4.9%","fee_text":"4.3%","mid_text":"+6.3% (-3.9% to +15.8%)","return_short":"-15.4%","return_text":"-15.4% (-24.8% to -5.2%)"},{"sample":"NBA","scans":"fresh","band":"50-80c","spread":4.281686253859352,"fee":2.1624544817181133,"mid":-0.7021153762252772,"ask":"68.0c","spread_text":"4.3%","fee_text":"2.2%","mid_text":"-0.7% (-5.2% to +4.0%)","return_short":"-5.7%","return_text":"-5.7% (-10.6% to -1.2%)"},{"sample":"NBA","scans":"fresh","band":"80c and up","spread":3.669483561979541,"fee":0.7584032147337638,"mid":-2.1293066931964435,"ask":"89.5c","spread_text":"3.7%","fee_text":"0.8%","mid_text":"-2.1% (-5.3% to +1.3%)","return_short":"-2.3%","return_text":"-2.3% (-5.6% to +0.8%)"},{"sample":"NBA","scans":"fresh","band":"all prices","spread":5.308342343569826,"fee":2.6626972865639713,"mid":2.7137285911974547,"ask":"42.8c","spread_text":"5.3%","fee_text":"2.7%","mid_text":"+2.7% (-2.3% to +7.8%)","return_short":"-10.7%","return_text":"-10.7% (-15.7% to -5.5%)"}]};
+const LEAGUES = [["NFL + NBA", "Both"], ["NFL", "NFL"], ["NBA", "NBA"]];
+const SCANS = [["all", "Any time before the game"], ["fresh", "Within 6 hours of the start"]];
+const state = { sample: "NFL + NBA", scans: "all" };
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function makeButtons(hostId, options, key) {
+  const host = document.getElementById(hostId);
+  for (const [value, label] of options) {
+    const button = el("button", "pick", label);
+    button.type = "button";
+    button.dataset.value = value;
+    button.addEventListener("click", () => { state[key] = value; render(); });
+    host.appendChild(button);
+  }
+}
+
+function rowsFor(table, bands) {
+  const picked = table.filter(r => r.sample === state.sample && r.scans === state.scans);
+  return bands.map(band => picked.find(r => r.band === band)).filter(Boolean);
+}
+
+// A round axis that covers the data and always includes zero.
+function axis(low, high, step) {
+  const min = Math.min(0, Math.floor(low / step) * step);
+  const max = Math.max(0, Math.ceil(high / step) * step);
+  const ticks = [];
+  for (let t = min; t <= max + 1e-9; t += step) ticks.push(Math.round(t));
+  return { min, max, ticks, at: v => ((v - min) / (max - min)) * 100 };
+}
+
+function axisRow(scale, unit) {
+  const row = el("div", "row axis-row");
+  row.appendChild(el("div"));
+  const line = el("div", "axis");
+  for (const t of scale.ticks) {
+    const tick = el("span", "", (t > 0 ? "+" : "") + t + unit);
+    tick.style.left = scale.at(t) + "%";
+    line.appendChild(tick);
+  }
+  row.appendChild(line);
+  row.appendChild(el("div", "value"));
+  return row;
+}
+
+function fillTable(id, headers, rows) {
+  const table = document.getElementById(id);
+  table.replaceChildren();
+  const head = el("tr");
+  for (const h of headers) head.appendChild(el("th", "", h));
+  table.appendChild(head);
+  for (const cells of rows) {
+    const tr = el("tr");
+    for (const c of cells) tr.appendChild(el("td", "", c));
+    table.appendChild(tr);
+  }
+}
+
+function renderGaps() {
+  const rows = rowsFor(DATA.band_rows, DATA.bands);
+  const scale = axis(Math.min(...rows.map(r => r.low)), Math.max(...rows.map(r => r.high)), 2);
+  const chart = document.getElementById("gap-chart");
+  chart.replaceChildren();
+  for (const r of rows) {
+    const row = el("div", "row");
+    row.appendChild(el("div", "label", r.band));
+    const track = el("div", "track");
+    const zero = el("div", "zero"); zero.style.left = scale.at(0) + "%";
+    const range = el("div", "range");
+    range.style.left = scale.at(r.low) + "%";
+    range.style.width = (scale.at(r.high) - scale.at(r.low)) + "%";
+    const dot = el("div", "dot"); dot.style.left = scale.at(r.gap) + "%";
+    track.append(zero, range, dot);
+    row.appendChild(track);
+    row.appendChild(el("div", "value", r.gap_text));
+    chart.appendChild(row);
+  }
+  chart.appendChild(axisRow(scale, ""));
+  fillTable("gap-table",
+    ["Price band", "Contracts", "Paid out", "Expected", "Gap in points (95% range)", "Credibility if independent", "Credibility by game"],
+    rows.map(r => [r.band, r.contracts, r.actual, r.expected, r.gap_text, r.cred_independent, r.cred_by_game]));
+}
+
+function renderCosts() {
+  const rows = rowsFor(DATA.cost_rows, DATA.bands.concat([DATA.all_prices]));
+  const highest = Math.max(...rows.map(r => r.spread + r.fee + Math.max(0, r.mid)));
+  const lowest = Math.min(...rows.map(r => Math.min(0, r.mid)));
+  const scale = axis(lowest, highest, highest - lowest > 60 ? 20 : 10);
+  const chart = document.getElementById("cost-chart");
+  chart.replaceChildren();
+  for (const r of rows) {
+    const row = el("div", r.band === DATA.all_prices ? "row total" : "row");
+    row.appendChild(el("div", "label", r.band));
+    const track = el("div", "track");
+    const place = (className, from, to) => {
+      const seg = el("div", "seg " + className);
+      seg.style.left = scale.at(from) + "%";
+      seg.style.width = Math.max(0, scale.at(to) - scale.at(from)) + "%";
+      track.appendChild(seg);
+    };
+    place("spread", 0, r.spread);
+    place("fee", r.spread, r.spread + r.fee);
+    if (r.mid >= 0) place("mid", r.spread + r.fee, r.spread + r.fee + r.mid);
+    else place("mid helped", r.mid, 0);
+    const zero = el("div", "zero"); zero.style.left = scale.at(0) + "%";
+    track.appendChild(zero);
+    row.appendChild(track);
+    row.appendChild(el("div", "value", "return " + r.return_short));
+    chart.appendChild(row);
+  }
+  chart.appendChild(axisRow(scale, "%"));
+  fillTable("cost-table",
+    ["Price band", "Average ask", "Half-spread", "Fee", "Midpoint error (95% range)", "Return (95% range)"],
+    rows.map(r => [r.band, r.ask, r.spread_text, r.fee_text, r.mid_text, r.return_text]));
+}
+
+function render() {
+  for (const button of document.querySelectorAll("button.pick")) {
+    const key = button.parentElement.id === "league" ? "sample" : "scans";
+    button.setAttribute("aria-pressed", String(state[key] === button.dataset.value));
+  }
+  const notes = [];
+  if (state.sample !== "NFL + NBA") notes.push("Single-league results are exploratory: with two leagues and six bands, some ranges will exclude zero by chance.");
+  if (state.scans === "fresh") notes.push("Showing only contracts whose price was logged within 6 hours of the start. The three findings above use all contracts.");
+  const caveat = document.getElementById("caveat");
+  caveat.textContent = notes.join(" ");
+  caveat.hidden = notes.length === 0;
+  renderGaps();
+  renderCosts();
+}
+
+makeButtons("league", LEAGUES, "sample");
+makeButtons("scans", SCANS, "scans");
+render();
+</script>
+</body>
+</html>
