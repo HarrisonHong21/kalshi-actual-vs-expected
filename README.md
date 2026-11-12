@@ -2,9 +2,12 @@
 
 **An actual-versus-expected study of prediction-market prices.** Harrison Hong, November 2026.
 
+**Interactive results page:** https://harrisonhong21.github.io/kalshi-actual-vs-expected/
+(switch between leagues and see every price band with its range).
 A one-page version is in [one_page_summary.pdf](one_page_summary.pdf).
 
 ![tests](https://github.com/HarrisonHong21/kalshi-actual-vs-expected/actions/workflows/tests.yml/badge.svg)
+![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 ## Summary
 
@@ -30,6 +33,21 @@ Results for a single league are exploratory: with two leagues and several bands,
 will exclude zero by chance.
 
 This is a study of prices. It contains no picks and is not betting advice.
+
+## What this project demonstrates
+
+- **Framing a question so data can answer it.** An insurer's actual-versus-expected test, applied
+  to a market price: did contracts priced near 10 cents pay out about 10% of the time?
+- **Honest uncertainty.** Every result has a 95% range from resampling whole games, because a
+  player's contracts in one game win or lose together. A credibility standard says which bands
+  have enough data to lean on.
+- **Separating causes.** The loss a buyer would have taken is split exactly into the half-spread,
+  the fee and the midpoint being wrong, so a cost known in advance is not mistaken for a pricing error.
+- **Checking my own result.** Leave-one-game-out, two other weightings, three order sizes, and a
+  written list of which choices were made after seeing results.
+- **Work someone else can check.** One Python script, tests for each calculation that run on
+  GitHub on every push, a test that this README quotes the script's output exactly, sample data
+  to run it on, and a results page built from the same tables.
 
 ## The question
 
@@ -418,6 +436,21 @@ order, so small orders pay more fee per contract.
 - **The book curve is mine.** Its misses on rare outcomes say more about the curve than about
   sportsbooks, and how it was built cannot be checked from this repository.
 
+## What I learned
+
+- **Counting rows overstates what you know.** Treating 17,653 contracts as independent would have
+  made every range too narrow. Resampling by game gave standard errors 1.1 to 2.0 times larger.
+- **"No gap found" is not "no gap".** No band's range excludes zero, but the ranges still allow a
+  gap of up to 4.5 points. I report the width of the range, not just whether it crosses zero.
+- **Look at the known costs before blaming the price.** The half-spread and the fee were 75% of
+  the hypothetical loss. The part that depends on the price being wrong cannot be told apart from zero.
+- **Small rules move small numbers.** Fee rounding alone moves the under-5c return from -38.7% on a
+  100-contract order to -45.7% on a single contract, so the order size had to be stated and tested.
+- **Say what was decided after seeing results.** Nothing was registered in advance, so the README
+  lists which choices came first and which came later, and treats single-league results as exploratory.
+- **Let a test guard the write-up.** A test fails if any headline number or table row in this
+  README differs from what the script wrote.
+
 ## Run it
 
     python3 -m venv .venv
@@ -435,6 +468,10 @@ per league, with these columns: `event_id`, `player`, `game_time`, `logged_at`, 
 `no_ask`, `result` (`yes`, `no` or `scalar`), `books_over`, `line`, `middle` and `distance`.
 A `ticker` column is optional and is used to check for duplicates.
 
+To rebuild the results page from the tables in `output/`:
+
+    .venv/bin/python make_dashboard.py
+
 ## What's here
 
 - `study.py`: the whole analysis. It prints every table and writes the files below.
@@ -448,3 +485,18 @@ A `ticker` column is optional and is used to check for duplicates.
 - `charts/`: the three charts.
 - `sample_data/`: made-up data in the same layout as the real data, and the script that makes it.
 - `one_page_summary.pdf`: the one-page version, written by the script.
+- `make_dashboard.py` and `docs/index.html`: the script that builds the interactive results page
+  from the tables in `output/`, and the page itself. The data is built into the page.
+- `CITATION.cff` and `LICENSE`: how to cite the study, and the MIT licence for the code.
+
+## How to cite
+
+Hong, Harrison (2026). *Do Kalshi prices match what happened? An actual-versus-expected study of
+prediction-market prices* (version 1.0.0). https://github.com/HarrisonHong21/kalshi-actual-vs-expected
+
+GitHub's "Cite this repository" button gives the same citation in BibTeX and APA form, from
+[CITATION.cff](CITATION.cff).
+
+## Licence
+
+The code is under the [MIT licence](LICENSE). The raw price data is not included or licensed here.
