@@ -3,6 +3,7 @@ message: "If you use this study, please cite it as below."
 title: "Do Kalshi prices match what happened? An actual-versus-expected study of prediction-market prices"
 type: software
 version: 1.0.0
+date-released: 2026-11-12
 authors:
   - family-names: Hong
     given-names: Harrison
