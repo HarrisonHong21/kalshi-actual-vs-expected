@@ -8,6 +8,7 @@ A one-page version is in [one_page_summary.pdf](one_page_summary.pdf).
 
 ![tests](https://github.com/HarrisonHong21/kalshi-actual-vs-expected/actions/workflows/tests.yml/badge.svg)
 ![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24177577.svg)](https://doi.org/10.5281/zenodo.24177577)
 
 ## Summary
 
@@ -492,7 +493,10 @@ To rebuild the results page from the tables in `output/`:
 ## How to cite
 
 Hong, Harrison (2026). *Do Kalshi prices match what happened? An actual-versus-expected study of
-prediction-market prices* (version 1.0.0). https://github.com/HarrisonHong21/kalshi-actual-vs-expected
+prediction-market prices* (version 1.0.0). Zenodo. https://doi.org/10.5281/zenodo.24177577
+
+That DOI always points to the latest archived version. The code is at
+https://github.com/HarrisonHong21/kalshi-actual-vs-expected.
 
 GitHub's "Cite this repository" button gives the same citation in BibTeX and APA form, from
 [CITATION.cff](CITATION.cff).

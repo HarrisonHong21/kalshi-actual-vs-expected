@@ -8,6 +8,7 @@ authors:
   - family-names: Hong
     given-names: Harrison
 license: MIT
+doi: 10.5281/zenodo.24177577
 repository-code: "https://github.com/HarrisonHong21/kalshi-actual-vs-expected"
 abstract: >-
   An actual-versus-expected study of 17,653 settled Kalshi NFL and NBA player-prop
