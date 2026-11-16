@@ -13,20 +13,24 @@ A one-page version is in [one_page_summary.pdf](one_page_summary.pdf).
 ## Summary
 
 A Kalshi contract priced at 10 cents implies about a 10% chance. This study checks that against
-17,653 settled NFL and NBA player-prop contracts from 88 games, 5 October to 9 November 2026.
+21,118 settled NFL and NBA player-prop contracts from 107 games, 5 October to 12 November 2026.
 
 1. **No measurable gap between prices and outcomes.** Measured at the midpoint between the buy
-   and sell price, contracts in every price band paid out within -2.0 to +0.9 percentage points of
+   and sell price, contracts in every price band paid out within -1.9 to +1.2 percentage points of
    what the price implied, and no band's 95% range excludes zero. That is not proof the prices
-   were right: the data cannot rule out a gap of up to 4.5 points in a band.
+   were right: the data cannot rule out a gap of up to 4.1 points in a band.
 2. **What a buyer would have lost was mostly the cost of trading.** Buying YES on every contract
-   at the quoted ask and holding it to settlement would have returned -9.9% (95% range -14.2% to
-   -5.9%). The half-spread and the fee, both known before buying, were 75% of that loss. Dropping
-   any one game leaves the return in the range -11.0% to -9.2%. This is a hypothetical return at
+   at the quoted ask and holding it to settlement would have returned -9.3% (95% range -12.8% to
+   -5.8%). The half-spread and the fee, both known before buying, were 79% of that loss. Dropping
+   any one game leaves the return in the range -10.2% to -8.7%. This is a hypothetical return at
    quoted prices, not a trading record.
 3. **Kalshi and a curve fitted to sportsbook lines scored almost the same overall.** They
-   differed on rare outcomes, where in this sample the curve missed in opposite directions in
-   the two leagues.
+   differed on rare outcomes in the NFL, where the curve gave them too low a chance and Kalshi's
+   midpoint was close to what happened.
+
+**Version 1.1** adds 19 NBA games (10 to 12 November) to version 1.0, with the method unchanged.
+The headline results held. One league result from version 1.0 did not: see
+[Version history](#version-history).
 
 The sample is small. Only the price bands from 50 cents up reach full credibility, so every
 result below comes with a range, and several things that look like findings are not established.
@@ -64,21 +68,24 @@ paying to trade?
 - **Contracts.** Each one asks whether a player will go over a line: passing, rushing and
   receiving yards, receptions and passing touchdowns in the NFL; points, rebounds, assists and
   three-pointers in the NBA. A player has a ladder of lines in each game.
-- **Size.** 17,990 rows were read. 105 were settled part-way (for example, the player left the
-  game) and are left out. Of the rest, 17,653 have both a buy and a sell price, so they have a
-  midpoint. They cover 88 games (49 NFL, 39 NBA) and 1,119 player-games. The data checks table
+- **Size.** 21,529 rows were read. 155 were settled part-way (for example, the player left the
+  game) and are left out. Of the rest, 21,118 have both a buy and a sell price, so they have a
+  midpoint. They cover 107 games (49 NFL, 58 NBA) and 1,373 player-games. The data checks table
   below has the full count.
 - **Collection.** Each scan of a game saves one row per contract with the time of the scan. If a
   game was scanned more than once before it started, the latest scan replaces the earlier one,
   and the app does not save prices for a game that has started. At least three hours after the
   start, it fills in Kalshi's settlement for the same contract ticker. No ticker appears twice.
-- **Timing.** Prices were logged a median of 1.5 hours before the start for NFL games and 3.2
-  hours for NBA games. 78% of contracts were logged within 6 hours of the start, and the longest
+- **Timing.** Prices were logged a median of 1.5 hours before the start for NFL games and 2.7
+  hours for NBA games. 80% of contracts were logged within 6 hours of the start, and the longest
   gap was 117 hours. The data records when the app read each price, not when the quote was last
   updated, so the age of the quotes is unknown.
 - **Which games.** The games are the ones my app scanned, some automatically shortly before the
   start and some by hand, and only while the app was running. They are not every game played in
   the period and not a random sample.
+- **Cutoff.** Version 1.1 uses every game the app had recorded with a start on or before 13
+  November 2026 (Eastern time). The last recorded game was on 12 November. The app recorded no
+  NFL games after 9 November in that window, so the NFL data is the same as in version 1.0.
 - **Not in this repository.** The raw price data and the app that collected it are not
   included. The tables in [output/](output/) are archived results: they cannot be regenerated
   from this repository alone. [sample_data/](sample_data/) has made-up data in the same layout,
@@ -90,34 +97,34 @@ which identifies the exact data behind these results.
 
 | Check | NFL | NBA |
 |---|---|---|
-| Rows read | 11,547 | 6,443 |
+| Rows read | 11,547 | 9,982 |
 | Logged after the game started (left out) | 0 | 0 |
-| Settled part-way (left out) | 49 | 56 |
+| Settled part-way (left out) | 49 | 106 |
 | Not settled yet (left out) | 0 | 0 |
-| Settled yes or no | 11,498 | 6,387 |
-| No price to sell YES, so no midpoint | 95 | 137 |
-| In the analysis | 11,403 | 6,250 |
+| Settled yes or no | 11,498 | 9,876 |
+| No price to sell YES, so no midpoint | 95 | 161 |
+| In the analysis | 11,403 | 9,715 |
 | Duplicate tickers | 0 | 0 |
 | Book-curve version stamped on the rows | 2026-10-05.1 | 2026-10-05.1 |
-| Games | 49 | 39 |
-| Player-games | 671 | 448 |
+| Games | 49 | 58 |
+| Player-games | 671 | 702 |
 | First game | 2026-10-05 | 2026-10-20 |
-| Last game | 2026-11-09 | 2026-11-07 |
+| Last game | 2026-11-09 | 2026-11-12 |
 
 The script also stops with an error if a price is blank or outside 0 to 1, if a price to buy
 YES is below the price to sell it, or if a result is not yes, no or scalar.
 
-**Who was left out for having no midpoint.** 232 settled contracts had a price to buy YES but
+**Who was left out for having no midpoint.** 256 settled contracts had a price to buy YES but
 nobody offering to buy it from you, so there is no price to sell and no midpoint.
 
 | League | Group | Contracts | Average ask | Asking under 10c | Paid out | Book curve said |
 |---|---|---|---|---|---|---|
 | NFL | In the analysis | 11,403 | 33.5c | 22.1% | 31.2% | 31.5% |
 | NFL | Left out: no price to sell YES | 95 | 5.6c | 95.8% | 2.1% | 2.8% |
-| NBA | In the analysis | 6,250 | 43.0c | 12.4% | 39.7% | 42.8% |
-| NBA | Left out: no price to sell YES | 137 | 7.6c | 75.2% | 6.6% | 5.7% |
+| NBA | In the analysis | 9,715 | 42.6c | 13.1% | 39.9% | 42.3% |
+| NBA | Left out: no price to sell YES | 161 | 7.8c | 77.0% | 6.8% | 5.5% |
 
-- **They are mostly longshots.** 95.8% of the NFL ones and 75.2% of the NBA ones were asking
+- **They are mostly longshots.** 95.8% of the NFL ones and 77.0% of the NBA ones were asking
   under 10c, and they rarely paid out.
 - **What that means for the results.** The study describes contracts with a quote on both
   sides. The thinnest longshots, where a buyer faces the worst terms, are under-represented.
@@ -170,6 +177,10 @@ Chosen later, after seeing results:
 - the cost-of-trading yardstick in finding 1;
 - every check in the robustness section.
 
+Version 1.1 added the games recorded after version 1.0 and changed nothing else. The decision
+to add them was made after seeing the version 1.0 results, and the cutoff was set to every
+recorded game up to the day the data was copied, not chosen to suit the results.
+
 ## Findings
 
 ### 1. No measurable gap between prices and outcomes
@@ -178,51 +189,53 @@ Chosen later, after seeing results:
 
 | Price band | Contracts | Paid out | Expected | Gap in points (95% range) | Credibility if independent | Credibility by game |
 |---|---|---|---|---|---|---|
-| under 5c | 1,514 | 3.2% | 3.6% | -0.4 (-1.5 to +0.7) | 0.23 | 0.18 |
-| 5-10c | 2,621 | 6.8% | 7.1% | -0.3 (-1.7 to +1.3) | 0.43 | 0.29 |
-| 10-20c | 3,034 | 13.7% | 14.5% | -0.7 (-2.6 to +1.3) | 0.69 | 0.43 |
-| 20-50c | 4,991 | 31.7% | 33.7% | -2.0 (-4.5 to +0.3) | 1.00 | 0.83 |
-| 50-80c | 4,021 | 63.3% | 64.5% | -1.1 (-3.9 to +1.4) | 1.00 | 1.00 |
-| 80c and up | 1,472 | 86.5% | 85.6% | +0.9 (-2.0 to +3.3) | 1.00 | 1.00 |
+| under 5c | 1,753 | 3.4% | 3.6% | -0.1 (-1.1 to +0.9) | 0.24 | 0.20 |
+| 5-10c | 3,021 | 6.9% | 7.1% | -0.2 (-1.4 to +1.1) | 0.46 | 0.33 |
+| 10-20c | 3,615 | 13.6% | 14.5% | -0.9 (-2.6 to +0.9) | 0.75 | 0.49 |
+| 20-50c | 5,932 | 31.8% | 33.7% | -1.9 (-4.1 to +0.2) | 1.00 | 0.95 |
+| 50-80c | 4,860 | 63.9% | 64.5% | -0.6 (-2.9 to +1.7) | 1.00 | 1.00 |
+| 80c and up | 1,937 | 87.1% | 85.9% | +1.2 (-1.1 to +3.2) | 1.00 | 1.00 |
 
 - **Both leagues together:** no band's range excludes zero.
 - **What that does and doesn't show.** A range that includes zero means the data found no gap,
-  not that there is none. The ranges allow a gap of up to 4.5 points in a band. Contracts under
+  not that there is none. The ranges allow a gap of up to 4.1 points in a band. Contracts under
   5c were priced at 3.6% on average. For the games sampled here, the 95% range puts their payout
-  rate anywhere from 2.1% to 4.3%. The games were not chosen at random, so that range does not
+  rate anywhere from 2.4% to 4.5%. The games were not chosen at random, so that range does not
   carry over to Kalshi as a whole.
 - **Is any gap big enough to matter?** One rough yardstick is the average cost of trading in
-  each band: the half-spread plus the fee per contract on a 10-contract order. In 2 of 6 bands
-  the whole range sits inside that cost. In the other four the range is too wide to rule out a
+  each band: the half-spread plus the fee per contract on a 10-contract order. In 4 of 6 bands
+  the whole range sits inside that cost. In the other two the range is too wide to rule out a
   gap larger than it. This compares averages across a band. It says nothing about whether any
   single contract could be traded at a profit.
 
 | Price band | Gap in points (95% range) | Trading cost per contract on a 10-contract order, points | Range inside the cost? |
 |---|---|---|---|
-| under 5c | -0.4 (-1.5 to +0.7) | 1.6 | yes |
-| 5-10c | -0.3 (-1.7 to +1.3) | 2.2 | yes |
-| 10-20c | -0.7 (-2.6 to +1.3) | 2.5 | no |
-| 20-50c | -2.0 (-4.5 to +0.3) | 3.0 | no |
-| 50-80c | -1.1 (-3.9 to +1.4) | 3.6 | no |
-| 80c and up | +0.9 (-2.0 to +3.3) | 3.1 | no |
+| under 5c | -0.1 (-1.1 to +0.9) | 1.7 | yes |
+| 5-10c | -0.2 (-1.4 to +1.1) | 2.2 | yes |
+| 10-20c | -0.9 (-2.6 to +0.9) | 2.6 | yes |
+| 20-50c | -1.9 (-4.1 to +0.2) | 3.0 | no |
+| 50-80c | -0.6 (-2.9 to +1.7) | 3.6 | yes |
+| 80c and up | +1.2 (-1.1 to +3.2) | 3.1 | no |
 
-- **Credibility is low for longshots.** The under-5c band has 0.23 of full credibility if
-  contracts were independent and 0.18 by game. The 5-10c band has 0.43 and 0.29.
+- **Credibility is low for longshots.** The under-5c band has 0.24 of full credibility if
+  contracts were independent and 0.20 by game. The 5-10c band has 0.46 and 0.33.
 
 The two leagues differ. These league results are exploratory:
 
 | Price band | NFL gap in points (95% range) | NBA gap in points (95% range) |
 |---|---|---|
-| under 5c | +0.1 (-1.2 to +1.6) | -1.8 (-3.0 to -0.3) |
-| 5-10c | +0.3 (-1.4 to +2.3) | -2.0 (-3.8 to -0.0) |
-| 10-20c | +0.1 (-2.3 to +2.8) | -2.2 (-4.6 to +0.3) |
-| 20-50c | -2.3 (-5.5 to +1.0) | -1.4 (-4.9 to +2.0) |
-| 50-80c | -2.4 (-6.4 to +1.3) | +0.7 (-2.2 to +3.5) |
-| 80c and up | 0.0 (-4.7 to +4.2) | +1.7 (-1.2 to +4.2) |
+| under 5c | +0.1 (-1.2 to +1.6) | -0.6 (-2.0 to +1.1) |
+| 5-10c | +0.3 (-1.4 to +2.3) | -1.1 (-2.6 to +0.4) |
+| 10-20c | +0.1 (-2.3 to +2.8) | -2.1 (-4.1 to -0.0) |
+| 20-50c | -2.3 (-5.5 to +1.0) | -1.4 (-3.8 to +1.1) |
+| 50-80c | -2.4 (-6.4 to +1.3) | +1.1 (-1.3 to +3.4) |
+| 80c and up | 0.0 (-4.7 to +4.2) | +1.8 (-0.4 to +3.7) |
 
 - **NFL:** the three bands under 20c are within 0.3 points of the midpoint.
-- **NBA:** contracts under 5c paid out 1.7% of the time against 3.5% expected (range -3.0 to -0.3
-  points). That is 7 payouts, and one of 12 league-band comparisons, so chance could produce it.
+- **NBA:** contracts under 5c paid out 2.9% of the time against 3.5% expected (range -2.0 to +1.1
+  points), on 19 payouts. In version 1.0 this gap excluded zero; with 19 more games it no longer
+  does. The 10-20c band's range now reaches just to zero, one of 12 league-band comparisons, so
+  chance could produce it.
 
 ### 2. What a buyer would have lost was mostly the cost of trading
 
@@ -240,18 +253,18 @@ on YES.
 
 | Price band | Average ask | Half-spread | Fee | Midpoint error (95% range) | Return (95% range) |
 |---|---|---|---|---|---|
-| under 5c | 4.8c | 24.4% | 7.1% | +7.7% (-13.4% to +28.6%) | -39.2% (-60.4% to -17.9%) |
-| 5-10c | 8.7c | 17.3% | 6.5% | +3.0% (-13.7% to +17.9%) | -26.7% (-41.2% to -10.5%) |
-| 10-20c | 16.0c | 9.2% | 5.7% | +4.2% (-7.8% to +15.2%) | -19.1% (-29.8% to -7.3%) |
-| 20-50c | 35.1c | 3.8% | 4.3% | +5.5% (-0.8% to +12.2%) | -13.7% (-20.1% to -7.5%) |
-| 50-80c | 66.5c | 3.0% | 2.3% | +1.7% (-2.0% to +5.7%) | -6.9% (-10.8% to -3.3%) |
-| 80c and up | 87.9c | 2.6% | 0.9% | -1.0% (-3.7% to +2.3%) | -2.5% (-5.7% to +0.2%) |
-| all prices | 36.9c | 4.4% | 3.0% | +2.5% (-1.7% to +6.9%) | -9.9% (-14.2% to -5.9%) |
+| under 5c | 4.8c | 24.7% | 7.1% | +2.6% (-18.2% to +21.4%) | -34.4% (-53.3% to -13.7%) |
+| 5-10c | 8.7c | 17.3% | 6.5% | +2.2% (-12.0% to +15.0%) | -25.9% (-38.5% to -11.8%) |
+| 10-20c | 16.1c | 9.3% | 5.7% | +5.3% (-5.2% to +15.1%) | -20.3% (-30.0% to -10.0%) |
+| 20-50c | 35.1c | 3.9% | 4.3% | +5.2% (-0.6% to +11.1%) | -13.5% (-19.2% to -7.7%) |
+| 50-80c | 66.6c | 3.0% | 2.3% | +0.9% (-2.5% to +4.3%) | -6.2% (-9.6% to -3.0%) |
+| 80c and up | 88.3c | 2.7% | 0.8% | -1.3% (-3.6% to +1.2%) | -2.2% (-4.7% to +0.1%) |
+| all prices | 37.7c | 4.4% | 3.0% | +2.0% (-1.7% to +5.4%) | -9.3% (-12.8% to -5.8%) |
 
-- **Overall:** of each dollar spent, 4.4% went to the half-spread, 3.0% to the fee and 2.5% (range
-  -1.7% to +6.9%) to the midpoint being too high. The midpoint part cannot be told apart from zero.
-- **Longshots cost the most because of the half-spread.** A half-spread of about a cent is 24.4%
-  of the money spent on a contract under 5c, where the return was -39.2%. At 80c and up it was -2.5%.
+- **Overall:** of each dollar spent, 4.4% went to the half-spread, 3.0% to the fee and 2.0% (range
+  -1.7% to +5.4%) to the midpoint being too high. The midpoint part cannot be told apart from zero.
+- **Longshots cost the most because of the half-spread.** A half-spread of about a cent is 24.7%
+  of the money spent on a contract under 5c, where the return was -34.4%. At 80c and up it was -2.2%.
 
 Longshots by league:
 
@@ -259,13 +272,13 @@ Longshots by league:
 |---|---|---|---|---|---|
 | NFL | under 5c | 21.9% | 7.2% | -2.5% (-31.4% to +23.0%) | -26.5% (-51.8% to +2.7%) |
 | NFL | 5-10c | 15.3% | 6.5% | -3.3% (-25.4% to +15.5%) | -18.4% (-36.8% to +3.1%) |
-| NBA | under 5c | 30.4% | 6.9% | +32.4% (+4.4% to +53.9%) | -69.7% (-91.5% to -42.1%) |
-| NBA | 5-10c | 22.6% | 6.4% | +19.4% (+0.1% to +38.4%) | -48.4% (-66.4% to -29.8%) |
+| NBA | under 5c | 29.3% | 6.9% | +10.5% (-19.7% to +36.8%) | -46.7% (-73.0% to -16.6%) |
+| NBA | 5-10c | 20.6% | 6.4% | +11.3% (-4.2% to +27.2%) | -38.3% (-53.4% to -23.6%) |
 
 - **NFL:** the half-spread and fee explain the whole longshot loss. The midpoint part is -2.5% under 5c.
-- **NBA:** under 5c, the midpoint error (32.4%) is as large as the half-spread (30.4%). This is
-  the NBA result from finding 1, in dollars.
-- **NBA half-spreads are wider:** 2.6 cents on average against 1.1 cents in the NFL.
+- **NBA:** under 5c, the midpoint error is 10.5%, against a half-spread of 29.3%, and its range
+  includes zero. In version 1.0 it was 32.4%, as large as the half-spread.
+- **NBA half-spreads are wider:** 2.4 cents on average against 1.1 cents in the NFL.
 
 ### 3. Kalshi against a curve fitted to sportsbook lines
 
@@ -300,34 +313,35 @@ zero, which means the data cannot separate them. It does not show they are equal
 
 | Sample | Scans | Contracts | Games | Kalshi midpoint | Book curve | Same chance for all | Kalshi minus book (95% range) |
 |---|---|---|---|---|---|---|---|
-| NFL + NBA | all | 17,653 | 88 | 0.1527 | 0.1527 | 0.2251 | 0.0000 (-0.0006 to +0.0007) |
+| NFL + NBA | all | 21,118 | 107 | 0.1526 | 0.1526 | 0.2281 | 0.0000 (-0.0005 to +0.0006) |
 | NFL | all | 11,403 | 49 | 0.1530 | 0.1535 | 0.2148 | -0.0005 (-0.0011 to +0.0001) |
-| NBA | all | 6,250 | 39 | 0.1521 | 0.1511 | 0.2393 | +0.0010 (-0.0004 to +0.0026) |
-| NFL + NBA | within 6 hours of the start | 13,821 | 62 | 0.1516 | 0.1517 | 0.2257 | -0.0002 (-0.0008 to +0.0005) |
+| NBA | all | 9,715 | 58 | 0.1521 | 0.1515 | 0.2398 | +0.0006 (-0.0004 to +0.0018) |
+| NFL + NBA | within 6 hours of the start | 16,914 | 79 | 0.1518 | 0.1519 | 0.2292 | -0.0001 (-0.0007 to +0.0004) |
 | NFL | within 6 hours of the start | 8,375 | 31 | 0.1530 | 0.1535 | 0.2149 | -0.0005 (-0.0012 to +0.0002) |
-| NBA | within 6 hours of the start | 5,446 | 31 | 0.1493 | 0.1490 | 0.2384 | +0.0003 (-0.0008 to +0.0015) |
-| NFL + NBA | more than 6 hours before | 3,832 | 26 | 0.1566 | 0.1560 | 0.2230 | +0.0006 (-0.0012 to +0.0032) |
+| NBA | within 6 hours of the start | 8,539 | 48 | 0.1506 | 0.1504 | 0.2395 | +0.0002 (-0.0006 to +0.0010) |
+| NFL + NBA | more than 6 hours before | 4,204 | 28 | 0.1558 | 0.1553 | 0.2238 | +0.0005 (-0.0013 to +0.0026) |
 | NFL | more than 6 hours before | 3,028 | 18 | 0.1529 | 0.1536 | 0.2144 | -0.0007 (-0.0017 to +0.0006) |
-| NBA | more than 6 hours before | 804 | 8 | 0.1706 | 0.1653 | 0.2446 | +0.0053 (-0.0022 to +0.0151) |
+| NBA | more than 6 hours before | 1,176 | 10 | 0.1633 | 0.1598 | 0.2413 | +0.0035 (-0.0016 to +0.0112) |
 
-- **Both leagues, all scans:** 0.1527 for each, against 0.2251 for giving every contract the same
-  chance. The range on the difference is -0.0006 to +0.0007.
+- **Both leagues, all scans:** 0.1526 for each, against 0.2281 for giving every contract the same
+  chance. The range on the difference is -0.0005 to +0.0006.
 - **Timing:** the same holds for scans within 6 hours of the start and for earlier ones. NBA
-  scores look worse on early scans, but that is 8 games and there is no range on that comparison.
+  scores look worse on early scans, but that is 10 games and the range on the difference includes zero.
 
-**Rare outcomes are where the two differ in this sample.** These are the contracts each source
+**Rare outcomes are where the two differ in the NFL.** These are the contracts each source
 gave under a 5% chance. The 5% line was chosen after seeing results, so treat this as exploratory.
 
 | League | Source | Contracts | Payouts | Paid out | Expected | Gap in points (95% range) |
 |---|---|---|---|---|---|---|
 | NFL | Kalshi midpoint | 1,098 | 41 | 3.7% | 3.6% | +0.1 (-1.2 to +1.6) |
 | NFL | book curve | 2,280 | 126 | 5.5% | 2.3% | +3.2 (+1.7 to +4.8) |
-| NBA | Kalshi midpoint | 416 | 7 | 1.7% | 3.5% | -1.8 (-3.0 to -0.3) |
-| NBA | book curve | 362 | 3 | 0.8% | 3.3% | -2.5 (-3.4 to -1.1) |
+| NBA | Kalshi midpoint | 655 | 19 | 2.9% | 3.5% | -0.6 (-2.0 to +1.1) |
+| NBA | book curve | 598 | 15 | 2.5% | 3.3% | -0.8 (-2.2 to +0.9) |
 
 - **NFL:** events the curve called rare happened 5.5% of the time against 2.3% expected. Kalshi's
   own rare contracts paid out 3.7% against 3.6%.
-- **NBA:** the curve erred the other way, 0.8% against 3.3%, on 3 payouts.
+- **NBA:** neither source's gap can be told apart from zero. The curve's rare outcomes paid out
+  2.5% against 3.3%. In version 1.0 that was 0.8% on 3 payouts, and its range excluded zero.
 
 Those rows judge each source on its own set of contracts. On the contracts that both sources
 gave under 5%, the comparison is like for like:
@@ -335,10 +349,11 @@ gave under 5%, the comparison is like for like:
 | League | Contracts | Payouts | Paid out | Kalshi midpoint said | Book curve said | Kalshi gap in points (95% range) | Book curve gap in points (95% range) |
 |---|---|---|---|---|---|---|---|
 | NFL | 1,052 | 39 | 3.7% | 3.6% | 1.9% | +0.1 (-1.2 to +1.7) | +1.8 (+0.4 to +3.3) |
-| NBA | 309 | 2 | 0.6% | 3.3% | 3.3% | -2.6 (-3.3 to -1.7) | -2.6 (-3.4 to -1.6) |
+| NBA | 501 | 11 | 2.2% | 3.3% | 3.2% | -1.1 (-2.4 to +0.5) | -1.0 (-2.3 to +0.6) |
 
 - **NFL:** on the same 1,052 contracts, 3.7% paid out. Kalshi said 3.6% and the curve said 1.9%.
-- **NBA:** both sources said 3.3% and 0.6% paid out, on 2 payouts.
+- **NBA:** on 501 contracts both sources said about 3.3% and 2.2% paid out, on 11 payouts. Neither
+  gap can be told apart from zero.
 
 The same contracts, grouped by how far the line is from the middle of the sportsbooks' lines
 (in typical game-to-game swings of the stat), show where each source drifts:
@@ -352,16 +367,17 @@ The same contracts, grouped by how far the line is from the middle of the sports
 | NFL | 0-1 above | 3,576 | 28.9% | 30.9% | 31.1% | -1.9 (-5.0 to +1.4) | -2.1 (-5.2 to +1.2) |
 | NFL | 1-2 above | 3,177 | 10.3% | 10.2% | 8.1% | +0.1 (-1.8 to +2.2) | +2.3 (+0.4 to +4.4) |
 | NFL | 2+ above | 1,417 | 5.2% | 4.6% | 1.5% | +0.5 (-1.2 to +2.5) | +3.7 (+2.0 to +5.6) |
-| NBA | 1+ below | 685 | 89.2% | 84.8% | 90.7% | +4.4 (+1.4 to +7.1) | -1.5 (-4.0 to +0.8) |
-| NBA | 0-1 below | 1,981 | 63.6% | 63.8% | 66.1% | -0.2 (-3.1 to +2.5) | -2.5 (-5.4 to +0.1) |
-| NBA | 0-1 above | 2,080 | 25.7% | 27.1% | 29.6% | -1.4 (-4.4 to +1.7) | -3.8 (-6.7 to -0.8) |
-| NBA | 1-2 above | 1,294 | 5.6% | 8.2% | 9.6% | -2.6 (-3.9 to -1.0) | -4.0 (-5.3 to -2.5) |
-| NBA | 2+ above | 210 | 1.0% | 3.8% | 2.7% | -2.8 (-4.3 to -1.2) | -1.7 (-2.7 to -0.2) |
+| NBA | 1+ below | 1,045 | 90.4% | 85.9% | 90.8% | +4.5 (+2.2 to +6.5) | -0.3 (-2.4 to +1.4) |
+| NBA | 0-1 below | 3,046 | 64.1% | 64.0% | 66.0% | 0.0 (-2.2 to +2.2) | -1.9 (-4.1 to +0.2) |
+| NBA | 0-1 above | 3,211 | 25.8% | 27.3% | 29.4% | -1.4 (-3.7 to +0.9) | -3.6 (-5.8 to -1.3) |
+| NBA | 1-2 above | 2,046 | 6.7% | 8.4% | 9.5% | -1.7 (-3.0 to -0.4) | -2.8 (-4.1 to -1.5) |
+| NBA | 2+ above | 367 | 2.5% | 3.6% | 2.7% | -1.1 (-2.7 to +0.6) | -0.2 (-1.7 to +1.4) |
 
 - **NFL, 2+ swings above the middle:** 5.2% paid out. Kalshi said 4.6% and the curve said 1.5%.
   In this sample the curve gave these outcomes too low a chance, and Kalshi's midpoint was
   closer to what happened.
-- **NBA, above the middle:** in this sample both sources gave these too high a chance.
+- **NBA, 0-2 swings above the middle:** in this sample both sources gave these too high a chance,
+  the curve more so.
 - **NBA, 1+ swings below the middle:** Kalshi's midpoint was too low. Wide NBA spreads may pull
   the midpoint down there, but this study does not test that.
 
@@ -372,16 +388,16 @@ dropped in turn. The table shows the lowest and highest value that gives.
 
 | Result | Games | Full sample | Lowest with one game dropped | Highest with one game dropped |
 |---|---|---|---|---|
-| Return from buying YES, all prices, both leagues | 88 | -9.9% | -11.0% | -9.2% |
-| Return from buying YES under 5c, both leagues | 86 | -39.2% | -43.3% | -37.9% |
-| Midpoint error as a share of money spent, both leagues | 88 | +2.5% | +1.7% | +3.5% |
-| NBA under 5c: actual minus expected (points) | 38 | -1.8 | -2.2 | -1.7 |
+| Return from buying YES, all prices, both leagues | 107 | -9.3% | -10.2% | -8.7% |
+| Return from buying YES under 5c, both leagues | 105 | -34.4% | -38.0% | -33.2% |
+| Midpoint error as a share of money spent, both leagues | 107 | +2.0% | +1.3% | +2.8% |
+| NBA under 5c: actual minus expected (points) | 57 | -0.6 | -1.1 | -0.5 |
 | NFL contracts the book curve gave under 5%: actual minus expected (points) | 48 | +3.2 | +2.8 | +3.4 |
-| Brier score, Kalshi minus book curve, both leagues (Brier) | 88 | 0.0000 | -0.0002 | +0.0001 |
+| Brier score, Kalshi minus book curve, both leagues (Brier) | 107 | 0.0000 | -0.0002 | +0.0001 |
 
-- **No single game drives any of them.** The overall return stays in the range -11.0% to -9.2%,
-  and the return under 5c in -43.3% to -37.9%.
-- **The two league results keep their sign.** The NBA under-5c gap stays in -2.2 to -1.7 points
+- **No single game drives any of them.** The overall return stays in the range -10.2% to -8.7%,
+  and the return under 5c in -38.0% to -33.2%.
+- **The two league results keep their sign.** The NBA under-5c gap stays in -1.1 to -0.5 points
   and the NFL book-curve gap in +2.8 to +3.4 points. This does not make them proven: the 95%
   ranges in the findings above are the measure of that.
 
@@ -390,12 +406,12 @@ once. Here each player-game, then each game, gets equal weight instead.
 
 | Result | Each contract counted once | Each player-game equal | Each game equal |
 |---|---|---|---|
-| Return from buying YES, all prices | -9.9% | -9.2% | -10.0% |
-| Midpoint error as a share of money spent, all prices | +2.5% | +1.2% | +1.3% |
-| Actual minus expected, all contracts (points) | -1.0 | -0.5 | -0.5 |
-| Actual minus expected, under 5c (points) | -0.4 | -0.6 | -0.5 |
+| Return from buying YES, all prices | -9.3% | -8.7% | -9.3% |
+| Midpoint error as a share of money spent, all prices | +2.0% | +0.8% | +1.0% |
+| Actual minus expected, all contracts (points) | -0.8 | -0.3 | -0.4 |
+| Actual minus expected, under 5c (points) | -0.1 | -0.4 | -0.3 |
 
-- **The return barely moves:** -9.2% with each player-game equal and -10.0% with each game equal.
+- **The return barely moves:** -8.7% with each player-game equal and -9.3% with each game equal.
 - **The midpoint error is about half as large** under either equal weighting, which fits the
   finding that it cannot be told apart from zero.
 
@@ -404,26 +420,27 @@ order, so small orders pay more fee per contract.
 
 | Price band | No fee | 100 contracts | 10 contracts | 1 contract |
 |---|---|---|---|---|
-| under 5c | -34.5% | -38.7% | -39.2% | -45.7% |
-| 5-10c | -21.7% | -26.4% | -26.7% | -29.8% |
-| 10-20c | -14.2% | -18.9% | -19.1% | -20.8% |
-| 20-50c | -9.8% | -13.6% | -13.7% | -14.7% |
-| 50-80c | -4.8% | -6.9% | -6.9% | -7.5% |
-| 80c and up | -1.6% | -2.4% | -2.5% | -2.8% |
-| all prices | -7.1% | -9.8% | -9.9% | -10.9% |
+| under 5c | -29.4% | -33.9% | -34.4% | -41.5% |
+| 5-10c | -20.7% | -25.5% | -25.9% | -28.9% |
+| 10-20c | -15.5% | -20.2% | -20.3% | -22.0% |
+| 20-50c | -9.6% | -13.4% | -13.5% | -14.4% |
+| 50-80c | -4.0% | -6.1% | -6.2% | -6.8% |
+| 80c and up | -1.4% | -2.1% | -2.2% | -2.6% |
+| all prices | -6.6% | -9.2% | -9.3% | -10.3% |
 
-- **Under 5c:** -34.5% with no fee, -38.7% on a 100-contract order and -45.7% on a single contract.
+- **Under 5c:** -29.4% with no fee, -33.9% on a 100-contract order and -41.5% on a single contract.
 - **These are prices on screen, not fills.** The data has no order sizes, so the study cannot say
   how many contracts could have been bought at the ask.
 
 ## Limits
 
-- **Small sample.** Five weeks of one season and 88 games. Only the bands from 50c up reach full credibility.
+- **Small sample.** Under six weeks of one season and 107 games, and the NFL part has not grown
+  since version 1.0. Only the bands from 50c up reach full credibility.
 - **Chosen games.** The games are the ones I chose to scan, not a random sample.
 - **Many comparisons.** With two leagues and several bands, a few ranges will exclude zero by
   chance. Treat single-league results as exploratory.
 - **Not registered in advance.** Some choices were made after seeing results; the section above lists them.
-- **Quotes on both sides only.** 232 contracts with no price to sell YES are left out, and most are longshots.
+- **Quotes on both sides only.** 256 contracts with no price to sell YES are left out, and most are longshots.
 - **YES side only.** YES means the player goes over the line. A NO buyer pays the same
   half-spread in cents, with the midpoint part reversed.
 - **Hypothetical returns.** Returns are at quoted asks with an assumed order size. They are not
@@ -439,14 +456,17 @@ order, so small orders pay more fee per contract.
 
 ## What I learned
 
-- **Counting rows overstates what you know.** Treating 17,653 contracts as independent would have
+- **Counting rows overstates what you know.** Treating 21,118 contracts as independent would have
   made every range too narrow. Resampling by game gave standard errors 1.1 to 2.0 times larger.
 - **"No gap found" is not "no gap".** No band's range excludes zero, but the ranges still allow a
-  gap of up to 4.5 points. I report the width of the range, not just whether it crosses zero.
-- **Look at the known costs before blaming the price.** The half-spread and the fee were 75% of
+  gap of up to 4.1 points. I report the width of the range, not just whether it crosses zero.
+- **A result that excludes zero can still be noise.** In version 1.0, NBA longshots looked
+  overpriced. Nineteen more games shrank that gap to -0.6 points, and its range now includes zero. Single-league results
+  were labelled exploratory for this reason.
+- **Look at the known costs before blaming the price.** The half-spread and the fee were 79% of
   the hypothetical loss. The part that depends on the price being wrong cannot be told apart from zero.
-- **Small rules move small numbers.** Fee rounding alone moves the under-5c return from -38.7% on a
-  100-contract order to -45.7% on a single contract, so the order size had to be stated and tested.
+- **Small rules move small numbers.** Fee rounding alone moves the under-5c return from -33.9% on a
+  100-contract order to -41.5% on a single contract, so the order size had to be stated and tested.
 - **Say what was decided after seeing results.** Nothing was registered in advance, so the README
   lists which choices came first and which came later, and treats single-league results as exploratory.
 - **Let a test guard the write-up.** A test fails if any headline number or table row in this
@@ -490,10 +510,21 @@ To rebuild the results page from the tables in `output/`:
   from the tables in `output/`, and the page itself. The data is built into the page.
 - `CITATION.cff` and `LICENSE`: how to cite the study, and the MIT licence for the code.
 
+## Version history
+
+- **1.1.0 (15 November 2026).** Adds the 19 NBA games the app recorded from 10 to 12 November:
+  107 games and 21,118 contracts, up from 88 and 17,653. The method, price bands and checks are
+  unchanged, and the NFL data is the same. The three headline findings held. Two NBA results from
+  1.0.0 no longer stand: the gap for NBA contracts under 5c (-1.8 points, range -3.0 to -0.3) is
+  now -0.6 (range -2.0 to +1.1), and the book curve's NBA rare-outcome gap (-2.5, range -3.4 to
+  -1.1) is now -0.8 (range -2.2 to +0.9). The version 1.0.0 tables are in the
+  [v1.0.0 release](https://github.com/HarrisonHong21/kalshi-actual-vs-expected/releases/tag/v1.0.0).
+- **1.0.0 (12 November 2026).** 88 games, 5 October to 9 November 2026.
+
 ## How to cite
 
 Hong, Harrison (2026). *Do Kalshi prices match what happened? An actual-versus-expected study of
-prediction-market prices* (version 1.0.0). Zenodo. https://doi.org/10.5281/zenodo.24177577
+prediction-market prices* (version 1.1.0). Zenodo. https://doi.org/10.5281/zenodo.24177577
 
 That DOI always points to the latest archived version. The code is at
 https://github.com/HarrisonHong21/kalshi-actual-vs-expected.

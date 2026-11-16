@@ -940,8 +940,7 @@ def write_summary_pdf(n, charts, path):
         finding("1. No measurable gap between prices and outcomes.",
                 f"With both leagues together, contracts in every price band paid out within "
                 f"{n['pooled_gap_lowest']} to {n['pooled_gap_highest']} points of the midpoint price, and no "
-                f"band's 95% range excludes zero. By league, the exception is NBA contracts under 5 cents: {n['nba_under5_actual']} paid out against "
-                f"{n['nba_under5_expected']} expected, on only {n['nba_under5_payouts']} payouts. Longshot "
+                f"band's 95% range excludes zero. Results for one league alone are exploratory. Longshot "
                 f"bands are thin: the under-5-cent band has {n['credibility_under5']} of full credibility, or "
                 f"{n['credibility_under5_by_game']} once contracts in the same game are allowed to move together. "
                 f"So this is not proof the prices were right: contracts under 5 cents were priced at "
