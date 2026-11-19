@@ -76,5 +76,11 @@
   "nfl_both_rare_book": "1.9%",
   "nfl_far_actual": "5.2%",
   "nfl_far_kalshi": "4.6%",
-  "nfl_far_book": "1.5%"
+  "nfl_far_book": "1.5%",
+  "hurdle_all_cents": "2.9",
+  "hurdle_under5_share": "47%",
+  "hurdle_80_up_share": "4%",
+  "return_at_midpoint_all": "-5.1%",
+  "return_at_midpoint_all_range": "-8.7% to -1.3%",
+  "midpoint_saves_points": "4.2"
 }

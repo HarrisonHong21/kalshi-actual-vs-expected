@@ -280,6 +280,31 @@ Longshots by league:
   includes zero. In version 1.0 it was 32.4%, as large as the half-spread.
 - **NBA half-spreads are wider:** 2.4 cents on average against 1.1 cents in the NFL.
 
+**The cost hurdle.** The half-spread and the fee set a hurdle. To expect to break even, a buyer's
+own estimate of the chance would have to sit that far above the midpoint. Across all prices the
+hurdle is 2.9 cents a contract, but what matters is its size next to the price. It is 47% of
+the midpoint under 5c and 4% at 80c and up. A longshot buyer would need to be far more right than
+a favourite buyer, before the midpoint error is counted at all.
+
+The last column repeats the hypothetical return as if every contract had been bought at the
+midpoint instead of the ask. That removes the half-spread but keeps the fee. Across all prices the
+return goes from -9.3% to -5.1% (range -8.7% to -1.3%), 4.2 points better, and the range still
+excludes zero. This is a best case. A midpoint price needs a resting order, which may not fill, and
+tends to fill when the price is about to move against the buyer.
+
+| Price band | Contracts | Average midpoint, cents | Half-spread, cents | Fee, cents | Cost hurdle, cents | Hurdle as share of the midpoint | Return at the ask | Return at the midpoint (95% range) |
+|---|---|---|---|---|---|---|---|---|
+| under 5c | 1,753 | 3.6 | 1.3 | 0.4 | 1.7 | 47% | -34.4% | -11.4% (-36.9% to +16.7%) |
+| 5-10c | 3,021 | 7.1 | 1.6 | 0.6 | 2.2 | 31% | -25.9% | -9.3% (-25.0% to +8.1%) |
+| 10-20c | 3,615 | 14.5 | 1.6 | 1.0 | 2.6 | 18% | -20.3% | -11.8% (-22.5% to -0.1%) |
+| 20-50c | 5,932 | 33.7 | 1.4 | 1.6 | 3.0 | 9% | -13.5% | -9.9% (-16.0% to -3.8%) |
+| 50-80c | 4,860 | 64.5 | 2.1 | 1.5 | 3.6 | 6% | -6.2% | -3.4% (-6.8% to +0.1%) |
+| 80c and up | 1,937 | 85.9 | 2.4 | 0.7 | 3.1 | 4% | -2.2% | +0.3% (-2.3% to +2.7%) |
+| all prices | 21,118 | 36.0 | 1.7 | 1.2 | 2.9 | 8% | -9.3% | -5.1% (-8.7% to -1.3%) |
+
+Both leagues, all scans, fee on a 10-contract order. Because the average midpoint and hurdle are
+rounded, the share column is worked out before rounding.
+
 ### 3. Kalshi against a curve fitted to sportsbook lines
 
 The second opinion is a curve my app fits to sportsbook lines. For each player and stat it takes

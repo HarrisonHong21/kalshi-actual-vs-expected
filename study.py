@@ -376,6 +376,88 @@ def cost_table(df, contracts=ORDER_SIZE, resamples=RESAMPLES, seed=SEED):
     return pd.DataFrame(rows)
 
 
+def hurdle_table(df, contracts=ORDER_SIZE, resamples=RESAMPLES, seed=SEED):
+    """The cost hurdle in each price band: how far a buyer's own estimate of the chance would
+    have to sit above the midpoint just to cover the half-spread and the fee (fee on a
+    `contracts`-contract order at the ask). It is shown in cents and as a share of the midpoint,
+    because one cent matters far more on a 4-cent contract than on an 85-cent one.
+
+    It also repeats the hypothetical YES-buying return at the midpoint instead of the ask. That
+    takes away the half-spread but keeps the fee (worked out at the midpoint price). A midpoint
+    fill is not guaranteed: it needs a resting order, and those tend to fill when the price is
+    about to move against the buyer, so this is a best case, not something a trader could count
+    on. Both leagues together, all scans."""
+    df = df[df["midpoint"].notna()].assign(one=1)
+    df["half_spread"] = df["yes_ask"] - df["midpoint"]
+    df["fee_at_ask"] = df["yes_ask"].map(lambda p: fee_per_contract(p, contracts))
+    df["spent_at_ask"] = df["yes_ask"] + df["fee_at_ask"]
+    df["spent_at_midpoint"] = df["midpoint"] + df["midpoint"].map(lambda p: fee_per_contract(p, contracts))
+
+    games = sorted(df["game_id"].unique())
+    sums = {}
+    for column in ["one", "midpoint", "happened", "half_spread", "fee_at_ask", "spent_at_ask", "spent_at_midpoint"]:
+        by_band = _per_game(df, games, column)
+        sums[column] = np.column_stack([by_band, by_band.sum(axis=1)])
+
+    draws = _game_draws(len(games), resamples, seed)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        resampled_paid = draws @ sums["happened"]
+        resampled_spent = draws @ sums["spent_at_midpoint"]
+        resampled_return = (resampled_paid - resampled_spent) / resampled_spent
+
+    rows = []
+    for i, label in enumerate(BAND_LABELS + [ALL_PRICES]):
+        total = {column: grid[:, i].sum() for column, grid in sums.items()}
+        n = int(total["one"])
+        if n == 0:
+            continue
+        low, high = np.nanpercentile(resampled_return[:, i], [2.5, 97.5])
+        hurdle = (total["half_spread"] + total["fee_at_ask"]) / n
+        rows.append({
+            "band": label,
+            "contracts": n,
+            "midpoint_cents": total["midpoint"] / n * 100,
+            "half_spread_cents": total["half_spread"] / n * 100,
+            "fee_cents": total["fee_at_ask"] / n * 100,
+            "hurdle_cents": hurdle * 100,
+            "hurdle_share_of_midpoint": hurdle / (total["midpoint"] / n),
+            "return_at_ask": (total["happened"] - total["spent_at_ask"]) / total["spent_at_ask"],
+            "return_at_midpoint": (total["happened"] - total["spent_at_midpoint"]) / total["spent_at_midpoint"],
+            "return_at_midpoint_low": low,
+            "return_at_midpoint_high": high,
+        })
+    return pd.DataFrame(rows)
+
+
+def hurdle_numbers(hurdle):
+    """Key figures from hurdle_table, as text, for the README check."""
+    rows = hurdle.set_index("band")
+    everything, under5, top = rows.loc[ALL_PRICES], rows.loc["under 5c"], rows.loc["80c and up"]
+    return {
+        "hurdle_all_cents": f"{everything['hurdle_cents']:.1f}",
+        "hurdle_under5_share": f"{under5['hurdle_share_of_midpoint'] * 100:.0f}%",
+        "hurdle_80_up_share": f"{top['hurdle_share_of_midpoint'] * 100:.0f}%",
+        "return_at_midpoint_all": _pct(everything["return_at_midpoint"], signed=True),
+        "return_at_midpoint_all_range": f"{_pct(everything['return_at_midpoint_low'], signed=True)} to "
+                                        f"{_pct(everything['return_at_midpoint_high'], signed=True)}",
+        "midpoint_saves_points": f"{(everything['return_at_midpoint'] - everything['return_at_ask']) * 100:.1f}",
+    }
+
+
+def hurdle_markdown(hurdle):
+    """The cost-hurdle table for the README."""
+    return "## Cost hurdle by price band\n\n" + _md(
+        ["Price band", "Contracts", "Average midpoint, cents", "Half-spread, cents", "Fee, cents",
+         "Cost hurdle, cents", "Hurdle as share of the midpoint", "Return at the ask",
+         "Return at the midpoint (95% range)"],
+        [[r["band"], f"{r['contracts']:,}", f"{r['midpoint_cents']:.1f}", f"{r['half_spread_cents']:.1f}",
+          f"{r['fee_cents']:.1f}", f"{r['hurdle_cents']:.1f}", f"{r['hurdle_share_of_midpoint'] * 100:.0f}%",
+          _pct(r["return_at_ask"], signed=True),
+          f"{_pct(r['return_at_midpoint'], signed=True)} ({_pct(r['return_at_midpoint_low'], signed=True)} to "
+          f"{_pct(r['return_at_midpoint_high'], signed=True)})"]
+         for _, r in hurdle.iterrows()]) + "\n"
+
+
 def tolerance_table(bands, costs):
     """Can the data rule out a gap big enough to matter? The rough yardstick is the average cost
     of trading in each band: the half-spread plus the fee per contract on an ORDER_SIZE-contract
@@ -1142,6 +1224,7 @@ def main(argv=None):
     tolerance = tolerance_table(bands, costs)
     rare_same = all_tables(df, rare_same_contracts_table)
     exclusions = exclusion_table(df)
+    hurdle = hurdle_table(df)
 
     print("\n\nOVERALL ACCURACY (Brier score, lower is better)\n")
     print(show_accuracy(accuracy))
@@ -1160,6 +1243,8 @@ def main(argv=None):
     print(weighting.drop(columns="key").round(4).to_string(index=False))
     print("\n\nRETURN FROM BUYING YES, BY ORDER SIZE (both leagues, as fractions)\n")
     print(order_sizes.round(3).to_string(index=False))
+    print("\n\nCOST HURDLE AND RETURN AT THE MIDPOINT (both leagues, as fractions)\n")
+    print(hurdle.round(3).to_string(index=False))
 
     out = Path(args.out)
     (out / "output").mkdir(parents=True, exist_ok=True)
@@ -1169,7 +1254,7 @@ def main(argv=None):
                         ("sensitivity_table", sensitivity), ("order_size_table", order_sizes),
                         ("weighting_table", weighting), ("data_quality", quality),
                         ("tolerance_table", tolerance), ("rare_same_contracts_table", rare_same),
-                        ("exclusion_table", exclusions)]:
+                        ("exclusion_table", exclusions), ("hurdle_table", hurdle)]:
         table.to_csv(out / "output" / f"{name}.csv", index=False)
     chart_actual_vs_expected(bands, out / "charts" / "actual_vs_expected.png")
     chart_cost_split(costs, out / "charts" / "cost_split.png")
@@ -1177,10 +1262,11 @@ def main(argv=None):
 
     numbers = key_numbers(df, quality, bands, costs, accuracy, rare, distance, sensitivity, order_sizes, weighting,
                           tolerance, rare_same, exclusions)
+    numbers.update(hurdle_numbers(hurdle))
     (out / "output" / "key_numbers.json").write_text(json.dumps(numbers, indent=2) + "\n")
     (out / "output" / "tables.md").write_text(
         markdown_tables(quality, bands, costs, accuracy, rare, distance, sensitivity, order_sizes, weighting,
-                        tolerance, rare_same, exclusions))
+                        tolerance, rare_same, exclusions) + "\n" + hurdle_markdown(hurdle))
     write_summary_pdf(numbers, out / "charts", out / "one_page_summary.pdf")
     print(f"\nSaved tables to {out / 'output'}, charts to {out / 'charts'} and {out / 'one_page_summary.pdf'}")
 

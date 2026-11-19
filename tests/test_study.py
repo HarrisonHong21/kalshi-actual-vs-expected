@@ -111,6 +111,27 @@ def test_the_three_parts_add_up_to_the_loss():
     assert everything["return"] == pytest.approx(study.yes_buy_return(df))
 
 
+def test_cost_hurdle_numbers():
+    # Same four contracts: half-spread 2c + fee 1.6c = a 3.6c hurdle on a 30c midpoint.
+    # At the midpoint the fee is on a 10-contract order at 30c: 14.7c, rounded up to 15c, 1.5c each.
+    table = study.hurdle_table(prepared(four_contracts_at_30c()), contracts=10, resamples=50)
+    row = table[table["band"] == "20-50c"].iloc[0]
+    assert row["hurdle_cents"] == pytest.approx(3.6)
+    assert row["hurdle_share_of_midpoint"] == pytest.approx(0.036 / 0.30)
+    assert row["return_at_ask"] == pytest.approx((0.25 - 0.336) / 0.336)
+    assert row["return_at_midpoint"] == pytest.approx((0.25 - 0.315) / 0.315)
+
+
+def test_return_at_the_ask_matches_the_cost_table():
+    rows = four_contracts_at_30c() + [contract("g2", 0.07, 0.96, "yes"), contract("g3", 0.90, 0.13, "yes")]
+    df = prepared(rows)
+    hurdle = study.hurdle_table(df, resamples=50).set_index("band")
+    costs = study.cost_table(df, resamples=50).set_index("band")
+    assert (hurdle["return_at_ask"] - costs["return"]).abs().max() < 1e-12
+    # buying at the midpoint never costs more than buying at the ask
+    assert (hurdle["return_at_midpoint"] >= hurdle["return_at_ask"]).all()
+
+
 def test_no_midpoint_loss_when_the_midpoint_is_right():
     # Midpoint 50c and half pay out: everything lost is spread and fee.
     rows = [contract("g1", 0.52, 0.52, "yes"), contract("g1", 0.52, 0.52, "no")]
