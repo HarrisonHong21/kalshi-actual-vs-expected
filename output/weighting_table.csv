@@ -1,5 +1,5 @@
 key,result,unit,by_contract,each_player_game_equal,each_game_equal
-return_all,"Return from buying YES, all prices",%,-0.093353056196382,-0.08656352128083714,-0.09342835023926961
-midpoint_all,"Midpoint error as a share of money spent, all prices",%,0.019746029121704676,0.007520071034057567,0.009998110232741993
-gap_all,"Actual minus expected, all contracts",points,-0.007668813334596081,-0.0028797708366609903,-0.004008075064850868
-gap_under5,"Actual minus expected, under 5c",points,-0.0013405590416429023,-0.004423176365140655,-0.002878351764964654
+return_all,"Return from buying YES, all prices",%,-0.08795934659261614,-0.0816687821837037,-0.08690546852687031
+midpoint_all,"Midpoint error as a share of money spent, all prices",%,0.01731191115896302,0.006290328156807747,0.007674545193256104
+gap_all,"Actual minus expected, all contracts",points,-0.006802794843994701,-0.002440806170011964,-0.0031058889010624055
+gap_under5,"Actual minus expected, under 5c",points,-0.0010925833748133453,-0.002698797727183362,-0.0016178801665908344

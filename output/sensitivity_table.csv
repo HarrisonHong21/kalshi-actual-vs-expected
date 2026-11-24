@@ -1,7 +1,7 @@
 key,result,unit,games,full_sample,lowest_without_one_game,highest_without_one_game
-return_all,"Return from buying YES, all prices, both leagues",%,107,-0.093353056196382,-0.10178183857958772,-0.08714414428654982
-return_under5,"Return from buying YES under 5c, both leagues",%,105,-0.3439898537097375,-0.3804418777036522,-0.3320791263594974
-midpoint_all,"Midpoint error as a share of money spent, both leagues",%,107,0.01974602912170468,0.013322978083555957,0.027972215381674177
-nba_under5_gap,NBA under 5c: actual minus expected,points,57,-0.005725190839694658,-0.011169544740973312,-0.004850628930817611
-nfl_book_rare_gap,NFL contracts the book curve gave under 5%: actual minus expected,points,48,0.03210942982456141,0.028439230769230772,0.03362112612612613
-brier_gap,"Brier score, Kalshi minus book curve, both leagues",Brier,107,-1.087300644000449e-05,-0.00017444271519077858,5.506640280561054e-05
+return_all,"Return from buying YES, all prices, both leagues",%,125,-0.08795934659261614,-0.09495074030281864,-0.08270838689193283
+return_under5,"Return from buying YES under 5c, both leagues",%,123,-0.34070974029696743,-0.37248390179855784,-0.3302726469760356
+midpoint_all,"Midpoint error as a share of money spent, both leagues",%,125,0.017311911158963016,0.01191363597724919,0.024165806842325277
+nba_under5_gap,NBA under 5c: actual minus expected,points,72,-0.004328899637243047,-0.008584672435105068,-0.003607673267326733
+nfl_book_rare_gap,NFL contracts the book curve gave under 5%: actual minus expected,points,51,0.031471833265884264,0.028075010412328204,0.03284790543343012
+brier_gap,"Brier score, Kalshi minus book curve, both leagues",Brier,125,-2.689586395213984e-06,-0.0001412316789087099,5.321582063613898e-05

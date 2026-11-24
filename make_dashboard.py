@@ -205,6 +205,15 @@ summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; width: fit-cont
       before buying, were {{known_share_of_loss}} of that loss. This is a hypothetical return, not a trading record.</li>
     <li><strong>It held when any one game was dropped.</strong> Leaving out each game in turn keeps the return
       between {{return_all_without_one_game}}.</li>
+    <li><strong>Sportsbooks priced NFL overs too high.</strong> Across {{nfl_props}} NFL props, the over's hit rate was
+      {{nfl_over_gap}} points off the books' de-vigged chance (95% range {{nfl_over_gap_range}}), led by
+      rushing yards ({{nfl_rushing_over_gap}}).</li>
+    <li><strong>The app's Normal curve was too thin in the NFL's right tail.</strong> On yards lines 2+ swings
+      above the middle, {{tail_actual}} paid out; the Normal curve said {{tail_normal}}, a Log-Normal curve
+      {{tail_lognormal}} and Kalshi {{tail_kalshi}}.</li>
+    <li><strong>One buying rule held up after the fact.</strong> NFL unders near the line at an edge over 3%
+      returned {{nfl_unders_return}} ({{nfl_unders_return_range}}) on {{nfl_unders_buys}} buys, but the rule was
+      found in this data. NBA overs ({{nba_overs_return}}) and NBA longshots ({{nba_longshots_return}}) lost.</li>
   </ol>
 
   <div>
@@ -254,11 +263,11 @@ summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; width: fit-cont
   <div class="wrap">
     <h2>What this does not show</h2>
     <ul>
-      <li>The sample is five weeks of one season. Only the bands from 50c up reach full credibility.</li>
+      <li>The sample is under seven weeks of one season. Only the bands from 20c up reach full credibility.</li>
       <li>The games are the ones my app scanned. They are not a random sample of Kalshi.</li>
       <li>Returns are at prices on screen with an assumed order size. They are not trades, and real fills could be worse.</li>
-      <li>Single-league results are exploratory. With two leagues and six bands, some ranges exclude zero by chance.</li>
-      <li>This is a study of prices. It contains no picks and is not betting advice.</li>
+      <li>Single-league, single-stat and single-rule results are exploratory. With this many comparisons, some ranges exclude zero by chance.</li>
+      <li>The buying rules were found in this data; only the paper trials are out of sample. Nothing here is betting advice.</li>
     </ul>
     <p>Method, robustness checks, code and tests are on
       <a href="https://github.com/HarrisonHong21/kalshi-actual-vs-expected">GitHub</a>.

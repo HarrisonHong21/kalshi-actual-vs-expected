@@ -1,0 +1,5 @@
+trial,rule,since,buys,games,contracts,return,return_low,return_high
+kalshi-edge-3,"NFL, either side, edge over 3% after the taker fee, within 1 swing of the books' middle",2026-11-10,56,3,560,0.24643874643874641,,
+kalshi-rush-unders,"The same, rushing-yards unders only",2026-11-10,11,3,110,0.7199017199017199,,
+kalshi-nfl-unders-maker,"NFL unders, edge over 3% at the maker fee, within 1 swing",2026-11-23,0,0,0,,,
+kalshi-nfl-skewed-2sd,"NFL, either side, edge over 3% after the taker fee, within 2 swings (Log-Normal yards curve)",2026-11-23,0,0,0,,,

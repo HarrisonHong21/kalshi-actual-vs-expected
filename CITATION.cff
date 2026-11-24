@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use this study, please cite it as below."
 title: "Do Kalshi prices match what happened? An actual-versus-expected study of prediction-market prices"
 type: software
-version: 1.1.0
-date-released: 2026-11-15
+version: 1.2.0
+date-released: 2026-11-23
 authors:
   - family-names: Hong
     given-names: Harrison
@@ -11,12 +11,14 @@ license: MIT
 doi: 10.5281/zenodo.24177577
 repository-code: "https://github.com/HarrisonHong21/kalshi-actual-vs-expected"
 abstract: >-
-  An actual-versus-expected study of 21,118 settled Kalshi NFL and NBA player-prop
-  contracts from 107 games (5 October to 12 November 2026). Compares the price implied
-  by each contract with how often it paid out, with game-cluster bootstrap intervals,
-  a credibility standard, and a decomposition of a hypothetical buy-at-the-ask return
-  into spread, fees and midpoint error. A study of prices; it contains no picks and
-  is not betting advice.
+  An actual-versus-expected study of 24,903 settled Kalshi NFL and NBA player-prop
+  contracts from 125 games and 6,113 graded sportsbook props (5 October to 19 November
+  2026). Compares each price's implied chance with what happened, with game-cluster
+  bootstrap intervals, a credibility standard, and a decomposition of a hypothetical
+  buy-at-the-ask return into spread, fees and midpoint error. Also tests the app's
+  Kalshi buying rules in sample and in frozen paper trials, pick'em lines, an old
+  projection model and the book curve's far tails. Back-tests and paper trades only;
+  not betting advice.
 keywords:
   - prediction markets
   - calibration

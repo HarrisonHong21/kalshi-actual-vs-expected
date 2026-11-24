@@ -1,6 +1,7 @@
 """Actual versus expected for Kalshi player-prop prices.
 
-Run:  .venv/bin/python study.py PATH/kalshi_record.csv PATH/nba_kalshi_record.csv
+Run:  .venv/bin/python study.py PATH/kalshi_record.csv PATH/nba_kalshi_record.csv \
+          --nfl-props PATH/predictions.csv --nba-props PATH/nba_predictions.csv
 
 Each row of the input is one Kalshi contract ("will this player go over this line?") with the
 price to buy YES and the price to buy NO just before the game, and how it settled. The script:
@@ -9,11 +10,14 @@ price to buy YES and the price to buy NO just before the game, and how it settle
 2. splits what a buyer would have lost into the half-spread, the fee and the midpoint being wrong;
 3. compares Kalshi's midpoint with a second opinion: a curve fitted to sportsbook lines;
 4. checks how much the headline results move when any one game is dropped, when each
-   player-game or each game is given equal weight, and with the size of the order.
+   player-game or each game is given equal weight, and with the size of the order;
+5. with the app's prop files (--nfl-props, --nba-props), runs record_checks.py: sportsbook
+   overs, pick'em lines, the old projection model, Kalshi buying rules, the paper trials and the
+   book curve's far tails.
 
 The price bands, the midpoint and the return formula were chosen at the first look at the data
 and not changed afterwards. Other choices were made later, after seeing results; the README
-lists which. Nothing here was registered in advance.
+lists which. Only the paper trials were fixed in advance.
 """
 import argparse
 import hashlib
@@ -51,10 +55,15 @@ RARE_BELOW = 0.05    # "rare" = given under a 5% chance
 FULL_CREDIBILITY = 1082
 
 FRESH_HOURS = 6      # a scan this close to the start of the game counts as "fresh"
-FEE_RATE = 0.07      # Kalshi's fee per contract is 0.07 x price x (1 - price), rounded up per order
+FEE_RATE = 0.07      # Kalshi's taker fee per contract is 0.07 x price x (1 - price), rounded up per order
+MAKER_FEE_RATE = 0.0175  # the fee on a resting (maker) order, used only for the midpoint scenario
 ORDER_SIZE = 10      # contracts per order when working out the fee
 RESAMPLES = 2000
 SEED = 20261110
+# The book curve is rebuilt whenever the app's pricing changes, and each row is stamped with the
+# version it was priced under. Comparisons with the curve use one version only, so two different
+# curves never get averaged together. Price-only results use every row.
+BOOK_CURVE_VERSION = "2026-10-05.1"
 
 KALSHI, BOOK = "Kalshi midpoint", "book curve"
 BOTH = "NFL + NBA"
@@ -142,6 +151,14 @@ def prepare(raw):
     return df
 
 
+def on_book_curve(df):
+    """Only the rows priced under BOOK_CURVE_VERSION, for the comparisons with the book curve.
+    Data without a version stamp (the made-up sample) is used as it is."""
+    if "model_version" not in df:
+        return df
+    return df[df["model_version"].astype(str) == BOOK_CURVE_VERSION]
+
+
 def data_quality(raw, paths=None):
     """What was read and what was left out, for each league: a record of the input that can be
     published when the raw prices can't be. `paths` ({"NFL": path, ...}) adds a SHA-256
@@ -167,6 +184,8 @@ def data_quality(raw, paths=None):
             # the version of the book curve stamped on each row when it was logged
             "book_curve_versions": ", ".join(sorted(part["model_version"].dropna().astype(str).unique()))
             if "model_version" in part else None,
+            # rows priced under a newer curve are kept for price results but left out of curve comparisons
+            "left_out_of_curve_comparisons": len(used) - len(on_book_curve(used)),
             "games": used["game_id"].nunique(),
             "player_games": used.groupby(["game_id", "player"]).ngroups,
             "first_game": str(kickoff.min().date()) if len(used) else None,
@@ -296,10 +315,10 @@ def band_table(df, resamples=RESAMPLES, seed=SEED):
     return table
 
 
-def fee_per_contract(price, contracts=ORDER_SIZE):
+def fee_per_contract(price, contracts=ORDER_SIZE, rate=FEE_RATE):
     """Kalshi's fee per contract on one order. The fee on the whole order is rounded up to the
     next cent, so small orders pay more per contract: one 20-cent contract pays 2 cents, not 1.12."""
-    order_fee = math.ceil(round(FEE_RATE * price * (1 - price) * contracts * 100, 6)) / 100
+    order_fee = math.ceil(round(rate * price * (1 - price) * contracts * 100, 6)) / 100
     return order_fee / contracts
 
 
@@ -383,15 +402,16 @@ def hurdle_table(df, contracts=ORDER_SIZE, resamples=RESAMPLES, seed=SEED):
     because one cent matters far more on a 4-cent contract than on an 85-cent one.
 
     It also repeats the hypothetical YES-buying return at the midpoint instead of the ask. That
-    takes away the half-spread but keeps the fee (worked out at the midpoint price). A midpoint
-    fill is not guaranteed: it needs a resting order, and those tend to fill when the price is
-    about to move against the buyer, so this is a best case, not something a trader could count
-    on. Both leagues together, all scans."""
+    takes away the half-spread. Buying at the midpoint means a resting order, so the fee is
+    Kalshi's maker fee (MAKER_FEE_RATE) at the midpoint price. A resting order may never fill,
+    and it tends to fill when the price is about to move against the buyer, so this is a best
+    case, not something a trader could count on. Both leagues together, all scans."""
     df = df[df["midpoint"].notna()].assign(one=1)
     df["half_spread"] = df["yes_ask"] - df["midpoint"]
     df["fee_at_ask"] = df["yes_ask"].map(lambda p: fee_per_contract(p, contracts))
     df["spent_at_ask"] = df["yes_ask"] + df["fee_at_ask"]
-    df["spent_at_midpoint"] = df["midpoint"] + df["midpoint"].map(lambda p: fee_per_contract(p, contracts))
+    df["spent_at_midpoint"] = df["midpoint"] + df["midpoint"].map(
+        lambda p: fee_per_contract(p, contracts, rate=MAKER_FEE_RATE))
 
     games = sorted(df["game_id"].unique())
     sums = {}
@@ -574,6 +594,7 @@ def sensitivity_table(df, contracts=ORDER_SIZE):
     df["book_gap"] = df["happened"] - df["books_over"]
     df["brier_gap"] = (df["midpoint"] - df["happened"]) ** 2 - (df["books_over"] - df["happened"]) ** 2
     under5 = df["band"] == "under 5c"
+    curve = on_book_curve(df)
 
     results = [
         ("return_all", "Return from buying YES, all prices, both leagues", "%", df, "profit", "spent"),
@@ -582,8 +603,8 @@ def sensitivity_table(df, contracts=ORDER_SIZE):
         ("nba_under5_gap", "NBA under 5c: actual minus expected", "points",
          df[under5 & (df["league"] == "NBA")], "kalshi_gap", "one"),
         ("nfl_book_rare_gap", "NFL contracts the book curve gave under 5%: actual minus expected", "points",
-         df[(df["books_over"] < RARE_BELOW) & (df["league"] == "NFL")], "book_gap", "one"),
-        ("brier_gap", "Brier score, Kalshi minus book curve, both leagues", "Brier", df, "brier_gap", "one"),
+         curve[(curve["books_over"] < RARE_BELOW) & (curve["league"] == "NFL")], "book_gap", "one"),
+        ("brier_gap", "Brier score, Kalshi minus book curve, both leagues", "Brier", curve, "brier_gap", "one"),
     ]
     rows = []
     for key, name, unit, part, top, bottom in results:
@@ -1014,7 +1035,7 @@ def write_summary_pdf(n, charts, path):
     small = ParagraphStyle("small", parent=body, fontSize=8, leading=10.5, textColor=MUTED)
 
     def finding(heading, text, chart, aspect):
-        width = 4.2 * inch
+        width = 3.8 * inch
         words = Paragraph(f"<b>{heading}</b><br/>{text}", body)
         return [words, Image(str(Path(charts) / chart), width=width, height=width / aspect)]
 
@@ -1048,10 +1069,25 @@ def write_summary_pdf(n, charts, path):
                 f"{n['nfl_far_kalshi']} and the curve {n['nfl_far_book']}. This is exploratory, and it is a "
                 f"finding about this study's own curve, not about sportsbooks.",
                 "kalshi_vs_book_curve.png", 11 / 5),
-    ], colWidths=[3.2 * inch, 4.2 * inch])
+    ], colWidths=[3.6 * inch, 3.8 * inch])
     findings.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (0, -1), 6), ("LEFTPADDING", (1, 0), (1, -1), 0),
                                   ("RIGHTPADDING", (0, 0), (0, -1), 10), ("RIGHTPADDING", (1, 0), (1, -1), 0),
                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
+
+    # The rest of the record (record_checks.py), when the prop files were given.
+    record = []
+    if "nfl_over_gap" in n and "nfl_unders_return" in n:
+        record = [Paragraph(
+            f"<b>4-7. The rest of the record.</b> Sportsbooks priced NFL overs too high: across {n['nfl_props']} "
+            f"props, the over's hit rate minus the books' de-vigged chance was {n['nfl_over_gap']} points "
+            f"({n['nfl_over_gap_range']}), led by rushing yards ({n['nfl_rushing_over_gap']}). On NFL yards lines "
+            f"2+ swings above the middle, {n['tail_actual']} paid out against {n['tail_normal']} on the app's "
+            f"Normal curve and {n['tail_lognormal']} on a Log-Normal one, so the app now uses Log-Normal. "
+            f"Buying NFL unders near the line at an edge over 3% returned {n['nfl_unders_return']} "
+            f"({n['nfl_unders_return_range']}) on {n['nfl_unders_buys']} buys, but that rule was found in this "
+            f"data; its frozen paper trial covers 3 games. NBA overs ({n['nba_overs_return']}), NBA longshots "
+            f"({n['nba_longshots_return']}) and the old projection model (Brier {n['brier_projection_model']} "
+            f"against {n['brier_sportsbooks']}) did worse than the sportsbooks' own prices.", body), Spacer(1, 8)]
 
     story = [
         Paragraph("Do Kalshi prices match what happened?", title),
@@ -1066,14 +1102,16 @@ def write_summary_pdf(n, charts, path):
                   f"cannot be ruled out, so every result is reported with a range.", body),
         Spacer(1, 10),
         findings,
+        *record,
         Paragraph("<b>Method.</b> Prices were logged before each game by my own app from Kalshi's public API; "
                   "results are Kalshi's settlements. The price bands and return formula were chosen at the first "
-                  "look at the data and other checks came later; nothing was registered in advance. Every 95% range comes from resampling whole games, because one "
+                  "look at the data and other checks came later; only the paper trials were fixed in advance. "
+                  "Every 95% range comes from resampling whole games, because one "
                   "player's contracts in a game win or lose together. The sportsbook curve was set from earlier "
                   "seasons and not changed during the sample. "
-                  "<b>Limits.</b> Five weeks of one season; games I chose to scan; the YES side only; contracts "
-                  "settled part-way are left out. Returns are hypothetical, at quoted prices, with no data on how "
-                  "many contracts were on offer. This is a study of prices, not betting advice. "
+                  "<b>Limits.</b> Under seven weeks of one season; games I chose to scan; contracts settled "
+                  "part-way are left out of the price study. Returns are back-tests and paper trades at quoted "
+                  "prices, not trades. Not betting advice. "
                   "The analysis code is covered by tests.", small),
     ]
     doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.55 * inch, rightMargin=0.55 * inch,
@@ -1202,6 +1240,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("nfl_csv")
     parser.add_argument("nba_csv")
+    parser.add_argument("--nfl-props", help="the app's NFL prop file (predictions.csv), for the record checks")
+    parser.add_argument("--nba-props", help="the app's NBA prop file (nba_predictions.csv), for the record checks")
     parser.add_argument("--out", default=str(Path(__file__).parent), help="folder for output/ and charts/")
     args = parser.parse_args(argv)
 
@@ -1215,16 +1255,30 @@ def main(argv=None):
 
     bands = all_tables(df, band_table)
     costs = all_tables(df, cost_table)
-    accuracy = all_tables(df, accuracy_table, early=True)
-    rare = all_tables(df, rare_table)
-    distance = all_tables(df, distance_table)
+    curve = on_book_curve(df)
+    accuracy = all_tables(curve, accuracy_table, early=True)
+    rare = all_tables(curve, rare_table)
+    distance = all_tables(curve, distance_table)
     sensitivity = sensitivity_table(df)
     order_sizes = order_size_table(df)
     weighting = weighting_table(df)
     tolerance = tolerance_table(bands, costs)
-    rare_same = all_tables(df, rare_same_contracts_table)
+    rare_same = all_tables(curve, rare_same_contracts_table)
     exclusions = exclusion_table(df)
     hurdle = hurdle_table(df)
+
+    # The rest of the app's record (record_checks.py). The tail check needs only the Kalshi data;
+    # the others need the prop files too.
+    import record_checks
+    tails = record_checks.tail_table(df)
+    trials = record_checks.paper_trial_table(raw)
+    backtest = record_checks.backtest_table(raw)
+    over_bias = pickem = model = None
+    if args.nfl_props and args.nba_props:
+        props = record_checks.load_props({"NFL": args.nfl_props, "NBA": args.nba_props})
+        over_bias = record_checks.over_bias_table(props)
+        pickem = record_checks.pickem_table(props)
+        model = record_checks.model_accuracy_table(props)
 
     print("\n\nOVERALL ACCURACY (Brier score, lower is better)\n")
     print(show_accuracy(accuracy))
@@ -1245,6 +1299,15 @@ def main(argv=None):
     print(order_sizes.round(3).to_string(index=False))
     print("\n\nCOST HURDLE AND RETURN AT THE MIDPOINT (both leagues, as fractions)\n")
     print(hurdle.round(3).to_string(index=False))
+    for title, table in [("SPORTSBOOK OVERS: ACTUAL AGAINST THE BOOKS' CHANCE", over_bias),
+                         ("PICK'EM LINES AND THE OLD MODEL'S TIE-BREAKER", pickem),
+                         ("OLD PROJECTION MODEL AGAINST THE SPORTSBOOKS (Brier)", model),
+                         ("KALSHI BUYING RULES ON THE WHOLE RECORD (in-sample)", backtest),
+                         ("PAPER TRIALS (out of sample)", trials),
+                         ("NFL YARDS LINES 2+ SWINGS ABOVE THE MIDDLE", tails)]:
+        if table is not None and len(table):
+            print(f"\n\n{title} (as fractions)\n")
+            print(table.round(3).to_string(index=False))
 
     out = Path(args.out)
     (out / "output").mkdir(parents=True, exist_ok=True)
@@ -1254,7 +1317,11 @@ def main(argv=None):
                         ("sensitivity_table", sensitivity), ("order_size_table", order_sizes),
                         ("weighting_table", weighting), ("data_quality", quality),
                         ("tolerance_table", tolerance), ("rare_same_contracts_table", rare_same),
-                        ("exclusion_table", exclusions), ("hurdle_table", hurdle)]:
+                        ("exclusion_table", exclusions), ("hurdle_table", hurdle),
+                        ("over_bias_table", over_bias), ("pickem_table", pickem), ("model_accuracy_table", model),
+                        ("backtest_table", backtest), ("paper_trial_table", trials), ("tail_table", tails)]:
+        if table is None or table.empty:
+            continue
         table.to_csv(out / "output" / f"{name}.csv", index=False)
     chart_actual_vs_expected(bands, out / "charts" / "actual_vs_expected.png")
     chart_cost_split(costs, out / "charts" / "cost_split.png")
@@ -1263,10 +1330,12 @@ def main(argv=None):
     numbers = key_numbers(df, quality, bands, costs, accuracy, rare, distance, sensitivity, order_sizes, weighting,
                           tolerance, rare_same, exclusions)
     numbers.update(hurdle_numbers(hurdle))
+    numbers.update(record_checks.record_numbers(over_bias, pickem, model, backtest, trials, tails))
     (out / "output" / "key_numbers.json").write_text(json.dumps(numbers, indent=2) + "\n")
     (out / "output" / "tables.md").write_text(
         markdown_tables(quality, bands, costs, accuracy, rare, distance, sensitivity, order_sizes, weighting,
-                        tolerance, rare_same, exclusions) + "\n" + hurdle_markdown(hurdle))
+                        tolerance, rare_same, exclusions) + "\n" + hurdle_markdown(hurdle) + "\n"
+        + record_checks.record_markdown(over_bias, pickem, model, backtest, trials, tails))
     write_summary_pdf(numbers, out / "charts", out / "one_page_summary.pdf")
     print(f"\nSaved tables to {out / 'output'}, charts to {out / 'charts'} and {out / 'one_page_summary.pdf'}")
 

@@ -113,13 +113,14 @@ def test_the_three_parts_add_up_to_the_loss():
 
 def test_cost_hurdle_numbers():
     # Same four contracts: half-spread 2c + fee 1.6c = a 3.6c hurdle on a 30c midpoint.
-    # At the midpoint the fee is on a 10-contract order at 30c: 14.7c, rounded up to 15c, 1.5c each.
+    # At the midpoint the order rests, so the maker fee applies: 0.0175 x 0.3 x 0.7 x 10 = 3.675c,
+    # rounded up to 4c, 0.4c each.
     table = study.hurdle_table(prepared(four_contracts_at_30c()), contracts=10, resamples=50)
     row = table[table["band"] == "20-50c"].iloc[0]
     assert row["hurdle_cents"] == pytest.approx(3.6)
     assert row["hurdle_share_of_midpoint"] == pytest.approx(0.036 / 0.30)
     assert row["return_at_ask"] == pytest.approx((0.25 - 0.336) / 0.336)
-    assert row["return_at_midpoint"] == pytest.approx((0.25 - 0.315) / 0.315)
+    assert row["return_at_midpoint"] == pytest.approx((0.25 - 0.304) / 0.304)
 
 
 def test_return_at_the_ask_matches_the_cost_table():
@@ -297,8 +298,12 @@ def test_smaller_orders_pay_more_fee_per_contract():
 
 def test_whole_study_runs_on_the_made_up_sample_data(tmp_path):
     sample = Path(__file__).parent.parent / "sample_data"
-    study.main([str(sample / "nfl_sample.csv"), str(sample / "nba_sample.csv"), "--out", str(tmp_path)])
+    study.main([str(sample / "nfl_sample.csv"), str(sample / "nba_sample.csv"),
+                "--nfl-props", str(sample / "nfl_props_sample.csv"), "--nba-props", str(sample / "nba_props_sample.csv"),
+                "--out", str(tmp_path)])
     for name in ["output/band_table.csv", "output/cost_table.csv", "output/accuracy_table.csv",
+                 "output/over_bias_table.csv", "output/pickem_table.csv", "output/model_accuracy_table.csv",
+                 "output/backtest_table.csv", "output/tail_table.csv",
                  "output/rare_table.csv", "output/distance_table.csv", "output/sensitivity_table.csv",
                  "output/order_size_table.csv", "output/key_numbers.json", "output/tables.md",
                  "charts/actual_vs_expected.png", "charts/cost_split.png", "charts/kalshi_vs_book_curve.png",

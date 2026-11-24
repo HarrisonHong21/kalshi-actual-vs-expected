@@ -1,4 +1,5 @@
-"""Make two small files of MADE-UP data so study.py can be run without real Kalshi prices.
+"""Make small files of MADE-UP data so study.py can be run without the real record: two Kalshi
+files and two prop files.
 
 Run:  .venv/bin/python sample_data/make_sample.py
 
@@ -59,9 +60,48 @@ def make_league(league, stat, middle_range, first_game, seed):
     return pd.DataFrame(rows)
 
 
+def make_props(league, stat, middle_range, first_game, seed):
+    """One made-up player prop per player and game, in the layout of the app's prop files."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for g in range(GAMES):
+        kickoff = pd.Timestamp(first_game, tz="UTC") + pd.Timedelta(days=2 * g)
+        for p in range(PLAYERS):
+            middle = rng.uniform(*middle_range)
+            swing = 5 + 0.3 * middle
+            line = round(middle) + 0.5
+            market_over = float(np.clip(1 - NormalDist(middle, swing).cdf(line) + rng.normal(0, 0.02), 0.3, 0.7))
+            actual = max(0.0, round(rng.normal(middle - 0.05 * swing, swing * 1.1)))
+            pp_line = float(round(middle) - (1 if p % 3 == 0 else 0))   # whole number, sometimes below
+            rows.append({
+                "logged_at": (kickoff - pd.Timedelta(hours=2)).isoformat(),
+                "model_version": "sample",
+                "game_time": kickoff.isoformat(),
+                "event_id": f"sample-{league.lower()}-{g:02d}",
+                "player": f"Sample Player {g * PLAYERS + p + 1}",
+                "stat": stat,
+                "line": line,
+                "market_over": round(market_over, 4),
+                "model_over": round(float(np.clip(market_over + rng.normal(0, 0.05), 0.05, 0.95)), 4),
+                "underdog_line": line,
+                "underdog_market_over": round(market_over, 4),
+                "underdog_model_over": round(float(np.clip(market_over + rng.normal(0, 0.05), 0.05, 0.95)), 4),
+                "prizepicks_line": pp_line,
+                "prizepicks_market_over": round(1 - NormalDist(middle, swing).cdf(pp_line), 4),
+                "prizepicks_model_over": "",
+                "actual": actual,
+                "result": "over" if actual > line else "under",
+            })
+    return pd.DataFrame(rows)
+
+
 if __name__ == "__main__":
     make_league("NFL", "receivingYards", (25, 90), "2026-01-04T18:00:00", seed=1).to_csv(
         HERE / "nfl_sample.csv", index=False)
     make_league("NBA", "points", (8, 28), "2026-01-05T00:00:00", seed=2).to_csv(
         HERE / "nba_sample.csv", index=False)
-    print(f"Wrote {HERE / 'nfl_sample.csv'} and {HERE / 'nba_sample.csv'}")
+    make_props("NFL", "receivingYards", (25, 90), "2026-01-04T18:00:00", seed=3).to_csv(
+        HERE / "nfl_props_sample.csv", index=False)
+    make_props("NBA", "points", (8, 28), "2026-01-05T00:00:00", seed=4).to_csv(
+        HERE / "nba_props_sample.csv", index=False)
+    print(f"Wrote the sample files to {HERE}")
